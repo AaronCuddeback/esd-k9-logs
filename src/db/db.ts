@@ -2,16 +2,19 @@ import Dexie, { type Table } from "dexie";
 import type {
   AppSettings,
   Attachment,
+  CommandRecord,
   Exercise,
   FollowUpItem,
   Hide,
   Location,
   RevisionEntry,
   SearchTypeDef,
-  TrainingSession
+  TrainingSession,
+  VaccinationRecord,
+  WeightEntry
 } from "./types";
 
-export const APP_VERSION = "1.0.0";
+export const APP_VERSION = "1.1.0";
 
 /**
  * Local-first database. Dexie versioning is the migration mechanism:
@@ -28,6 +31,9 @@ export class EsdK9Db extends Dexie {
   revisions!: Table<RevisionEntry, string>;
   attachments!: Table<Attachment, string>;
   followUps!: Table<FollowUpItem, string>;
+  commands!: Table<CommandRecord, string>;
+  vaccinations!: Table<VaccinationRecord, string>;
+  weights!: Table<WeightEntry, string>;
 
   constructor(name = "esd-k9-logs") {
     super(name);
@@ -42,6 +48,32 @@ export class EsdK9Db extends Dexie {
       attachments: "id, sessionId, exerciseId",
       followUps: "id, sessionId, done, createdAt"
     });
+    // v2 (app 1.1): command tracking, K9 health (vaccinations + weight log),
+    // GPS + case number on sessions, K9 photo + vet contact in settings
+    this.version(2)
+      .stores({
+        commands: "id, name, archived",
+        vaccinations: "id, name, nextDueDate",
+        weights: "id, date"
+      })
+      .upgrade(async (tx) => {
+        await tx
+          .table("sessions")
+          .toCollection()
+          .modify((s: Partial<TrainingSession>) => {
+            if (s.gps === undefined) s.gps = null;
+            if (s.caseNumber === undefined) s.caseNumber = "";
+          });
+        await tx
+          .table("settings")
+          .toCollection()
+          .modify((s: Partial<AppSettings>) => {
+            if (s.k9PhotoDataUrl === undefined) s.k9PhotoDataUrl = "";
+            if (s.vetName === undefined) s.vetName = "";
+            if (s.vetPhone === undefined) s.vetPhone = "";
+            if (s.k9HealthNotes === undefined) s.k9HealthNotes = "";
+          });
+      });
   }
 }
 
@@ -106,6 +138,10 @@ export function defaultSettings(): AppSettings {
     currentCertDate: "",
     certExpirationDate: "",
     agencyLogoDataUrl: "",
+    k9PhotoDataUrl: "",
+    vetName: "",
+    vetPhone: "",
+    k9HealthNotes: "",
     theme: "system",
     dateFormat: "MM/dd/yyyy",
     reportHeader: "",

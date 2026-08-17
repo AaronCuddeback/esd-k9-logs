@@ -1,7 +1,7 @@
 {
   "name": "esd-k9-logs",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Mobile-first offline training log application for Electronic Storage Device Detection K9 teams",
   "type": "module",
   "scripts": {

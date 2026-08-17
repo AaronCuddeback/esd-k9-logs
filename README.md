@@ -31,6 +31,13 @@ backups go only where the handler sends them.
   under-practiced search types, follow-up training items.
 - **Backup & restore**: single-file JSON backup of everything (attachments
   included), with merge or replace restore, verified by automated tests.
+- **K9 readiness tracking** (v1.1): command mastery with proficiency
+  ratings and practice recency; vaccination records with due-date
+  reminders; weight log; vet contact; annual-certification expiration
+  warnings on the home screen.
+- **Field context** (v1.1): optional GPS capture on sessions (with map
+  links and export columns), case/reference numbers for deployment-related
+  records, K9 photo on the profile.
 - **Security options**: app PIN (stored as salted SHA-256 hash), optional
   auto-lock, identity withholding in exports. See `docs/SECURITY.md`.
 

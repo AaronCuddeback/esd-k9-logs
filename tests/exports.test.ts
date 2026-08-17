@@ -104,6 +104,16 @@ describe("XLSX workbook", () => {
     expect(rows.get("Hides placed")).toBe(stats.hidesPlaced);
   });
 
+  /** Column number for a header name on a sheet (1-indexed). */
+  function colByHeader(ws: ExcelJS.Worksheet, header: string): number {
+    let col = -1;
+    ws.getRow(1).eachCell((cell, n) => {
+      if (String(cell.value) === header) col = n;
+    });
+    expect(col).toBeGreaterThan(0);
+    return col;
+  }
+
   it("does not lose long notes", async () => {
     const long = "Long note ".repeat(200).trim();
     data.sessions[0].summary = long;
@@ -111,9 +121,11 @@ describe("XLSX workbook", () => {
     const buf = await wb.xlsx.writeBuffer();
     const readBack = new ExcelJS.Workbook();
     await readBack.xlsx.load(buf as ArrayBuffer);
+    const ws = readBack.getWorksheet("Sessions")!;
+    const summaryCol = colByHeader(ws, "Summary");
     let found = false;
-    readBack.getWorksheet("Sessions")!.eachRow((row) => {
-      if (String(row.getCell(13).value) === long) found = true;
+    ws.eachRow((row) => {
+      if (String(row.getCell(summaryCol).value) === long) found = true;
     });
     expect(found).toBe(true);
   });
@@ -121,8 +133,9 @@ describe("XLSX workbook", () => {
   it("withholds identity when the setting is off", async () => {
     data.settings = { ...data.settings, includeIdentityInExports: false };
     const wb = await buildWorkbook(data);
-    const row = wb.getWorksheet("Sessions")!.getRow(2);
-    expect(row.getCell(9).value).toBe("[withheld]"); // Handler column
+    const ws = wb.getWorksheet("Sessions")!;
+    const handlerCol = colByHeader(ws, "Handler");
+    expect(ws.getRow(2).getCell(handlerCol).value).toBe("[withheld]");
   });
 });
 

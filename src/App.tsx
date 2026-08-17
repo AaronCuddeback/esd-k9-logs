@@ -19,6 +19,8 @@ import ReportsScreen from "./screens/ReportsScreen";
 import StatsScreen from "./screens/StatsScreen";
 import MoreScreen from "./screens/MoreScreen";
 import FollowUpsScreen from "./screens/FollowUpsScreen";
+import CommandsScreen from "./screens/CommandsScreen";
+import HealthScreen from "./screens/HealthScreen";
 import ProfileScreen from "./screens/ProfileScreen";
 import LocationsScreen from "./screens/LocationsScreen";
 import SettingsScreen from "./screens/SettingsScreen";
@@ -125,6 +127,8 @@ export default function App() {
           <Route path="/stats" element={<StatsScreen />} />
           <Route path="/more" element={<MoreScreen />} />
           <Route path="/followups" element={<FollowUpsScreen />} />
+          <Route path="/commands" element={<CommandsScreen />} />
+          <Route path="/health" element={<HealthScreen />} />
           <Route path="/profile" element={<ProfileScreen />} />
           <Route path="/locations" element={<LocationsScreen />} />
           <Route path="/settings" element={<SettingsScreen />} />

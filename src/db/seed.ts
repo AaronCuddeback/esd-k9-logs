@@ -415,6 +415,10 @@ export async function seedDatabase(database: EsdK9Db = db): Promise<void> {
     session.correctiveFollowUp = s.followUp ?? "";
     session.nextFocus = s.nextFocus ?? "";
     session.env = { ...emptyEnv(), temperatureF: s.tempF ?? null, weather: s.weather ?? "" };
+    if (s.location.includes("Cedar Hollow")) {
+      // fictional demo coordinates matching the "marked GPS" note in the hides
+      session.gps = { lat: 39.4721, lon: -84.2153, accuracyM: 8, capturedAt: session.createdAt };
+    }
     session.welfare = { ...emptyWelfare(), energyMotivation: 4 as Rating };
     const status = s.status ?? "completed";
     session.status = status;
@@ -496,6 +500,8 @@ export async function seedDatabase(database: EsdK9Db = db): Promise<void> {
       }
     }
   }
+
+  await seedHealthAndCommands(database);
 }
 
 async function touchSeedLocation(database: EsdK9Db, name: string, address: string) {
@@ -519,4 +525,93 @@ async function touchSeedLocation(database: EsdK9Db, name: string, address: strin
 
 export async function isDatabaseEmpty(database: EsdK9Db = db): Promise<boolean> {
   return (await database.sessions.count()) === 0;
+}
+
+async function seedHealthAndCommands(database: EsdK9Db) {
+  if ((await database.commands.count()) > 0) return;
+  const ts = nowIso();
+  const daysAgoIso = (n: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() - n);
+    return localDateIso(d);
+  };
+  const inDaysIso = (n: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + n);
+    return localDateIso(d);
+  };
+
+  const commands: [string, string, number, number][] = [
+    // name, category, proficiency, practiced days ago
+    ["Sit", "Obedience", 5, 2],
+    ["Down", "Obedience", 5, 2],
+    ["Stay", "Obedience", 4, 5],
+    ["Heel", "Obedience", 4, 2],
+    ["Recall (come)", "Control", 5, 2],
+    ["Seek / search", "Detection", 5, 2],
+    ["Show me", "Detection", 4, 9],
+    ["Leave it / out", "Control", 4, 5],
+    ["Place / kennel", "Obedience", 3, 16]
+  ];
+  for (const [name, category, proficiency, ago] of commands) {
+    await database.commands.add({
+      id: uuid(),
+      name,
+      category,
+      proficiency: proficiency as 5,
+      lastPracticed: daysAgoIso(ago),
+      notes: name === "Place / kennel" ? "Needs more reps in new environments" : "",
+      archived: false,
+      createdAt: ts,
+      updatedAt: ts
+    });
+  }
+
+  const vaccinations: [string, number, number][] = [
+    // name, given days ago, due in days
+    ["Rabies", 320, 45],
+    ["DHPP", 200, 165],
+    ["Bordetella", 350, 15],
+    ["Leptospirosis", 180, 185]
+  ];
+  for (const [name, givenAgo, dueIn] of vaccinations) {
+    await database.vaccinations.add({
+      id: uuid(),
+      name,
+      dateGiven: daysAgoIso(givenAgo),
+      nextDueDate: inDaysIso(dueIn),
+      administeredBy: "Fairview Veterinary Clinic",
+      notes: "",
+      createdAt: ts,
+      updatedAt: ts
+    });
+  }
+
+  const weights: [number, number][] = [
+    // days ago, weight lb
+    [90, 63.4],
+    [60, 64.0],
+    [30, 64.8],
+    [7, 64.2]
+  ];
+  for (const [ago, lb] of weights) {
+    await database.weights.add({
+      id: uuid(),
+      date: daysAgoIso(ago),
+      weightLb: lb,
+      notes: "",
+      createdAt: ts
+    });
+  }
+
+  const settings = await database.settings.get("app");
+  if (settings && !settings.vetName) {
+    await database.settings.put({
+      ...settings,
+      vetName: "Fairview Veterinary Clinic",
+      vetPhone: "555-0148",
+      k9HealthNotes: "No known allergies. Fed exclusively through training (3–4 cups/day).",
+      updatedAt: nowIso()
+    });
+  }
 }

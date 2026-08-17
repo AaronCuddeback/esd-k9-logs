@@ -185,12 +185,27 @@ export default function SessionEditorScreen() {
               options={[
                 { value: "training", label: "Training" },
                 { value: "certification", label: "Certification" },
+                { value: "deployment_training", label: "Deployment" },
                 { value: "remedial", label: "Remedial" },
                 { value: "other", label: "Other" }
               ]}
               onChange={(v) => update({ activityType: v })}
             />
           </Field>
+          {session.activityType !== "training" && (
+            <Field
+              label="Case / reference # (optional)"
+              htmlFor="s-case"
+              hint="Ties this record to a case, incident, or certification event."
+            >
+              <input
+                id="s-case"
+                type="text"
+                value={session.caseNumber}
+                onChange={(e) => update({ caseNumber: e.target.value })}
+              />
+            </Field>
+          )}
           {(session.activityType === "other" ||
             session.activityType === "demonstration" ||
             session.activityType === "deployment_training") && (
@@ -228,6 +243,11 @@ export default function SessionEditorScreen() {
               onChange={(e) => update({ locationAddress: e.target.value })}
             />
           </Field>
+          <GpsField session={session} update={update} />
+        </div>
+
+        <div className="card">
+          <h3>Team &amp; setting</h3>
           <Field label="Environment">
             <Segmented<Environment>
               ariaLabel="Environment"
@@ -485,6 +505,74 @@ export default function SessionEditorScreen() {
         </button>
       </Sheet>
     </>
+  );
+}
+
+function GpsField({
+  session,
+  update
+}: {
+  session: TrainingSession;
+  update: (p: Partial<TrainingSession>) => void;
+}) {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const capture = () => {
+    if (!("geolocation" in navigator)) {
+      toast("GPS is not available on this device");
+      return;
+    }
+    setBusy(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        update({
+          gps: {
+            lat: Number(pos.coords.latitude.toFixed(6)),
+            lon: Number(pos.coords.longitude.toFixed(6)),
+            accuracyM: pos.coords.accuracy ? Math.round(pos.coords.accuracy) : null,
+            capturedAt: new Date().toISOString()
+          }
+        });
+        setBusy(false);
+      },
+      (err) => {
+        toast(
+          err.code === err.PERMISSION_DENIED
+            ? "Location permission denied — enable it in browser settings"
+            : "Could not get a GPS fix"
+        );
+        setBusy(false);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
+    );
+  };
+  return (
+    <div className="field">
+      <label>GPS coordinates (optional)</label>
+      {session.gps ? (
+        <div className="toggle-row">
+          <div>
+            <div className="label">
+              {session.gps.lat}, {session.gps.lon}
+            </div>
+            <div className="sub">
+              {session.gps.accuracyM ? `±${session.gps.accuracyM} m · ` : ""}
+              captured {new Date(session.gps.capturedAt).toLocaleTimeString()}
+            </div>
+          </div>
+          <button type="button" className="btn small secondary" onClick={() => update({ gps: null })}>
+            Remove
+          </button>
+        </div>
+      ) : (
+        <button type="button" className="btn secondary block" disabled={busy} onClick={capture}>
+          {busy ? "Getting GPS fix…" : "📍 Capture current GPS position"}
+        </button>
+      )}
+      <div className="hint">
+        Stored only in this record; useful for the training-site history and reports.
+      </div>
+    </div>
   );
 }
 

@@ -4,6 +4,8 @@ import { useSettings } from "../hooks";
 
 const items: { to: string; icon: string; label: string; sub: string }[] = [
   { to: "/followups", icon: "🎯", label: "Follow-up items", sub: "Training areas flagged for extra work" },
+  { to: "/commands", icon: "🎓", label: "Command tracking", sub: "Proficiency and practice recency per command" },
+  { to: "/health", icon: "🩺", label: "K9 health", sub: "Vaccinations, weight log, vet contact" },
   { to: "/profile", icon: "🐕‍🦺", label: "K9 & handler profile", sub: "Team, certification, agency details" },
   { to: "/locations", icon: "📍", label: "Locations", sub: "Favorites and reusable training sites" },
   { to: "/backup", icon: "💾", label: "Backup & restore", sub: "Export or import all data" },
@@ -19,9 +21,17 @@ export default function MoreScreen() {
       <main className="shell-main">
         {settings.k9Name && (
           <div className="card" style={{ display: "flex", gap: 12, alignItems: "center" }}>
-            <div style={{ fontSize: "2rem" }} aria-hidden="true">🐕‍🦺</div>
+            {settings.k9PhotoDataUrl ? (
+              <img
+                src={settings.k9PhotoDataUrl}
+                alt={`K9 ${settings.k9Name}`}
+                style={{ width: 52, height: 52, borderRadius: "50%", objectFit: "cover" }}
+              />
+            ) : (
+              <div style={{ fontSize: "2rem" }} aria-hidden="true">🐕‍🦺</div>
+            )}
             <div>
-              <strong>K9 {settings.k9Name}</strong>
+              <strong>K9 {settings.k9Name}</strong>{" "}
               <div style={{ color: "var(--text-2)", fontSize: "var(--fs-sm)" }}>
                 {settings.handlerName}{settings.agency ? ` · ${settings.agency}` : ""}
               </div>

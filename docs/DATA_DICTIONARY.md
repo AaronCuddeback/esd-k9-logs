@@ -126,6 +126,13 @@ performance — not a veterinary record.
 Find rate is a **training metric**, not a scientific estimate of operational
 reliability, and the UI/reports say so wherever it appears.
 
+## Sessions — v1.1 additions
+
+| Field | Meaning |
+| --- | --- |
+| gps | Optional `{lat, lon, accuracyM, capturedAt}` captured on-device at the training site. Exported as GPS lat/lon columns and shown as a map link. |
+| caseNumber | Optional case / incident / reference number (shown for non-training activity types; always exported). |
+
 ## Other tables
 
 - **locations**: name, address, kind, favorite, useCount, lastUsedAt.
@@ -138,6 +145,16 @@ reliability, and the UI/reports say so wherever it appears.
   document/other), caption, mimeType, blob, byteSize, createdAt. Images are
   re-encoded (max 1600 px, JPEG q0.82), which strips EXIF metadata.
 - **followUps**: sessionId?, text, done, createdAt, completedAt.
+- **commands** (v1.1): name, category (Obedience/Detection/Control/Other),
+  proficiency (0–5), lastPracticed, notes, archived. Practice recency over
+  7 days is flagged in the UI.
+- **vaccinations** (v1.1): name, dateGiven, nextDueDate, administeredBy,
+  notes. Due within 30 days or overdue triggers a home-screen reminder.
+- **weights** (v1.1): date, weightLb, notes. Latest entry and delta vs the
+  previous entry are shown on the K9 Health screen.
+- **settings — v1.1 additions**: k9PhotoDataUrl, vetName, vetPhone,
+  k9HealthNotes. Certification expiration within 60 days (or past) triggers
+  a home-screen banner — ESD certifications are typically annual.
 
 ## Backup file format
 

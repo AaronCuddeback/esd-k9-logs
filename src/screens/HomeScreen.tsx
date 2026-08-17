@@ -7,6 +7,55 @@ import { fmtDate, fmtMinutes, localDateIso } from "../lib/format";
 import { seedDatabase, isDatabaseEmpty } from "../db/seed";
 import { useState } from "react";
 
+function CertExpiryBanner({ expiration, k9Name }: { expiration: string; k9Name: string }) {
+  if (!expiration) return null;
+  const today = localDateIso();
+  const days = Math.round(
+    (new Date(expiration + "T00:00:00").getTime() - new Date(today + "T00:00:00").getTime()) / 86400000
+  );
+  if (days > 60) return null;
+  const expired = days < 0;
+  return (
+    <div className={`banner ${expired ? "error" : "warn"}`} role="alert">
+      <span aria-hidden="true">📜</span>
+      <span>
+        {expired
+          ? `${k9Name || "K9"}'s certification expired ${-days} day${days === -1 ? "" : "s"} ago (${expiration}). Update it in the profile after recertification.`
+          : `${k9Name || "K9"}'s certification expires in ${days} day${days === 1 ? "" : "s"} (${expiration}).`}
+      </span>
+    </div>
+  );
+}
+
+function VaccineDueBanner() {
+  const due = useLiveQuery(async () => {
+    const all = await db.vaccinations.toArray();
+    const today = new Date(localDateIso() + "T00:00:00").getTime();
+    return all
+      .filter((v) => v.nextDueDate)
+      .map((v) => ({
+        name: v.name,
+        days: Math.round((new Date(v.nextDueDate + "T00:00:00").getTime() - today) / 86400000)
+      }))
+      .filter((v) => v.days <= 30);
+  }, []);
+  if (!due || due.length === 0) return null;
+  const overdue = due.filter((v) => v.days < 0);
+  return (
+    <Link to="/health" style={{ textDecoration: "none" }}>
+      <div className={`banner ${overdue.length ? "error" : "warn"}`} role="alert">
+        <span aria-hidden="true">💉</span>
+        <span>
+          {due
+            .map((v) => `${v.name} ${v.days < 0 ? `overdue ${-v.days}d` : `due in ${v.days}d`}`)
+            .join(" · ")}{" "}
+          — tap to open K9 health.
+        </span>
+      </div>
+    </Link>
+  );
+}
+
 export default function HomeScreen() {
   const navigate = useNavigate();
   const settings = useSettings();
@@ -51,6 +100,11 @@ export default function HomeScreen() {
       <TopBar title={settings.k9Name ? `K9 ${settings.k9Name}` : "ESD K9 Logs"} />
       <main className="shell-main">
         <OfflineBanner />
+        <CertExpiryBanner
+          expiration={settings.certExpirationDate}
+          k9Name={settings.k9Name}
+        />
+        <VaccineDueBanner />
 
         {drafts && drafts.length > 0 && (
           <div className="card" style={{ borderColor: "var(--warn)" }}>

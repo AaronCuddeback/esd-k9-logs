@@ -72,6 +72,10 @@ export interface AppSettings {
   currentCertDate: string;
   certExpirationDate: string;
   agencyLogoDataUrl: string; // small data-url image or ""
+  k9PhotoDataUrl: string; // small data-url image or ""
+  vetName: string;
+  vetPhone: string;
+  k9HealthNotes: string; // allergies, medications, standing conditions
   theme: "system" | "light" | "dark";
   dateFormat: "MM/dd/yyyy" | "dd/MM/yyyy" | "yyyy-MM-dd";
   reportHeader: string;
@@ -142,6 +146,14 @@ export interface ReviewInfo {
   reviewedAt: string; // ISO datetime or ""
 }
 
+/** Optional GPS fix captured on the device at the training site. */
+export interface GpsPoint {
+  lat: number;
+  lon: number;
+  accuracyM: number | null;
+  capturedAt: string;
+}
+
 export interface TrainingSession {
   id: string;
   date: string; // ISO date yyyy-MM-dd
@@ -152,6 +164,8 @@ export interface TrainingSession {
   locationId: string | null;
   locationName: string;
   locationAddress: string;
+  gps: GpsPoint | null;
+  caseNumber: string; // case / incident / reference number (optional)
   environment: Environment;
   handlerName: string;
   k9Name: string;
@@ -272,6 +286,41 @@ export interface Attachment {
   createdAt: string;
 }
 
+// ---------- K9 health ----------
+
+export interface VaccinationRecord {
+  id: string;
+  name: string; // Rabies, DHPP, Bordetella, Leptospirosis, ...
+  dateGiven: string; // ISO date or ""
+  nextDueDate: string; // ISO date or ""
+  administeredBy: string; // vet / clinic
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WeightEntry {
+  id: string;
+  date: string; // ISO date
+  weightLb: number;
+  notes: string;
+  createdAt: string;
+}
+
+// ---------- command / obedience tracking ----------
+
+export interface CommandRecord {
+  id: string;
+  name: string; // e.g., "Sit", "Down", "Seek", "Show me", recall
+  category: string; // obedience / detection / control / other
+  proficiency: Rating | 0; // 0 = not rated, 5 = mastered
+  lastPracticed: string; // ISO date or ""
+  notes: string;
+  archived: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // ---------- follow-up items ----------
 
 export interface FollowUpItem {
@@ -298,6 +347,10 @@ export interface BackupFile {
   searchTypes: SearchTypeDef[];
   revisions: RevisionEntry[];
   followUps: FollowUpItem[];
+  /** Absent in backups created before v1.1 — treated as empty on restore. */
+  commands?: CommandRecord[];
+  vaccinations?: VaccinationRecord[];
+  weights?: WeightEntry[];
   /** Attachments are stored base64-encoded in backups. */
   attachments: (Omit<Attachment, "blob"> & { dataBase64: string })[];
 }

@@ -57,6 +57,8 @@ export function newSession(defaults: {
     locationId: null,
     locationName: "",
     locationAddress: "",
+    gps: null,
+    caseNumber: "",
     environment: "indoor",
     handlerName: defaults.handlerName,
     k9Name: defaults.k9Name,

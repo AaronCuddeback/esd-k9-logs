@@ -26,7 +26,7 @@ function base64ToBlob(b64: string, mimeType: string): Blob {
 }
 
 export async function createBackup(database: EsdK9Db = db): Promise<BackupFile> {
-  const [settings, sessions, exercises, hides, locations, searchTypes, revisions, followUps, attachments] =
+  const [settings, sessions, exercises, hides, locations, searchTypes, revisions, followUps, commands, vaccinations, weights, attachments] =
     await Promise.all([
       database.settings.get("app"),
       database.sessions.toArray(),
@@ -36,6 +36,9 @@ export async function createBackup(database: EsdK9Db = db): Promise<BackupFile> 
       database.searchTypes.toArray(),
       database.revisions.toArray(),
       database.followUps.toArray(),
+      database.commands.toArray(),
+      database.vaccinations.toArray(),
+      database.weights.toArray(),
       database.attachments.toArray()
     ]);
   const encodedAttachments = [];
@@ -56,6 +59,9 @@ export async function createBackup(database: EsdK9Db = db): Promise<BackupFile> 
     searchTypes,
     revisions,
     followUps,
+    commands,
+    vaccinations,
+    weights,
     attachments: encodedAttachments
   };
 }
@@ -68,6 +74,11 @@ export function validateBackup(data: unknown): asserts data is BackupFile {
     throw new Error(`Unsupported backup version: ${d.formatVersion}`);
   for (const key of ["sessions", "exercises", "hides", "locations", "searchTypes", "revisions", "followUps", "attachments"] as const) {
     if (!Array.isArray(d[key])) throw new Error(`Backup is missing "${key}".`);
+  }
+  // These tables were added in app v1.1 — older backups legitimately omit them
+  for (const key of ["commands", "vaccinations", "weights"] as const) {
+    if (d[key] !== undefined && !Array.isArray(d[key]))
+      throw new Error(`Backup field "${key}" is malformed.`);
   }
   // Referential integrity: every exercise/hide must point at a session in the file
   const sessionIds = new Set(d.sessions!.map((s) => s.id));
@@ -101,6 +112,9 @@ export async function restoreBackup(
       database.searchTypes,
       database.revisions,
       database.followUps,
+      database.commands,
+      database.vaccinations,
+      database.weights,
       database.attachments
     ],
     async () => {
@@ -113,6 +127,9 @@ export async function restoreBackup(
           database.searchTypes.clear(),
           database.revisions.clear(),
           database.followUps.clear(),
+          database.commands.clear(),
+          database.vaccinations.clear(),
+          database.weights.clear(),
           database.attachments.clear()
         ]);
         if (data.settings) await database.settings.put(data.settings);
@@ -152,6 +169,18 @@ export async function restoreBackup(
       for (const st of data.searchTypes) {
         const exists = await database.searchTypes.get(st.id);
         if (!exists) await database.searchTypes.put(st);
+      }
+      for (const c of data.commands ?? []) {
+        const exists = await database.commands.get(c.id);
+        if (!exists) await database.commands.put(c);
+      }
+      for (const v of data.vaccinations ?? []) {
+        const exists = await database.vaccinations.get(v.id);
+        if (!exists) await database.vaccinations.put(v);
+      }
+      for (const w of data.weights ?? []) {
+        const exists = await database.weights.get(w.id);
+        if (!exists) await database.weights.put(w);
       }
       for (const a of data.attachments) {
         if (!importSessionIds.has(a.sessionId)) continue;

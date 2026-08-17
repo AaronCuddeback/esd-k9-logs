@@ -158,6 +158,13 @@ function renderSessionDetail(
       ["Activity", ACTIVITY_LABELS[session.activityType] + (session.activityOther ? ` — ${session.activityOther}` : "")],
       ["Time", `${session.startTime || "—"} to ${session.endTime || "—"} (${fmtMinutes(sessionMinutes(session))})`],
       ["Location", `${session.locationName}${session.locationAddress ? `, ${session.locationAddress}` : ""} (${session.environment})`],
+      [
+        "GPS",
+        session.gps
+          ? `${session.gps.lat}, ${session.gps.lon}${session.gps.accuracyM ? ` (±${session.gps.accuracyM} m)` : ""}`
+          : ""
+      ],
+      ["Case / reference #", session.caseNumber],
       ["Handler / K9", `${session.handlerName} / ${session.k9Name}`],
       ["Trainer / evaluator", session.trainerName],
       ["Other personnel", session.otherPersonnel],

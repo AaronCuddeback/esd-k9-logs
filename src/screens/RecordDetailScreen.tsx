@@ -87,6 +87,22 @@ export default function RecordDetailScreen() {
           <dl className="kv">
             <dt>Record ID</dt><dd style={{ fontFamily: "monospace", fontSize: "var(--fs-xs)" }}>{session.id}</dd>
             <dt>Location</dt><dd>{session.locationName}{session.locationAddress ? `, ${session.locationAddress}` : ""} ({session.environment})</dd>
+            {session.gps && (
+              <>
+                <dt>GPS</dt>
+                <dd>
+                  <a
+                    href={`https://www.google.com/maps?q=${session.gps.lat},${session.gps.lon}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {session.gps.lat}, {session.gps.lon}
+                  </a>
+                  {session.gps.accuracyM ? ` (±${session.gps.accuracyM} m)` : ""}
+                </dd>
+              </>
+            )}
+            {session.caseNumber && (<><dt>Case / ref #</dt><dd>{session.caseNumber}</dd></>)}
             <dt>Time</dt><dd>{session.startTime || "—"}–{session.endTime || "—"} ({fmtMinutes(sessionMinutes(session))})</dd>
             <dt>Activity</dt><dd>{ACTIVITY_LABELS[session.activityType]}{session.activityOther ? ` — ${session.activityOther}` : ""}</dd>
             <dt>Handler / K9</dt><dd>{session.handlerName} / {session.k9Name}</dd>

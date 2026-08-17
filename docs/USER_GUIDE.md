@@ -105,6 +105,36 @@ More → **Backup & restore**:
 Settings → *Search types* → add (e.g., "Aircraft search"). Custom types can
 be archived when no longer needed; historical records keep resolving.
 
+## Command tracking (More → Command tracking)
+
+Track each command's proficiency (1 learning – 5 mastered) and when it was
+last practiced. Tap **✓** to mark a command practiced today; amber badges
+flag commands not practiced in over a week. Start from the built-in
+standard list or add your own.
+
+## K9 health (More → K9 health)
+
+- **Vaccinations**: record each vaccine with date given and next due date.
+  Items due within 30 days (or overdue) get a badge here and a banner on
+  the Home screen.
+- **Weight log**: one-tap weight entries with the latest value and change
+  shown at the top.
+- **Vet & standing notes**: veterinarian contact and standing conditions
+  (allergies, medications). Day-of condition still belongs in each
+  session's welfare check.
+- **Certification**: your certification expiration (set in the profile)
+  drives a Home-screen warning starting 60 days out — ESD certifications
+  are typically renewed annually.
+
+## GPS and case numbers
+
+In a session's basics card, tap **📍 Capture current GPS position** to
+stamp the record with coordinates (the browser will ask for location
+permission the first time). Coordinates appear on the record with a map
+link and export as columns in the XLSX and lines in the PDF. For
+deployment-related, certification, or other non-routine activity, a
+**Case / reference #** field appears so records can be tied to a case.
+
 ## The follow-up list
 
 Anything you type in "Corrective action / follow-up training needed"

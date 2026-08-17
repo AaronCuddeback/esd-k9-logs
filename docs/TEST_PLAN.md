@@ -1,8 +1,17 @@
 # Test Plan & Results
 
 Delivery verification for ESD K9 Training Logs v1.0.0, 2026-08-16.
+Updated for v1.1 (JDK9-comparison features), same date: suite is now
+**59/59 passing** — `tests/health.test.ts` adds coverage for the schema-v2
+tables (commands, vaccinations, weights), their backup round-trip,
+backward compatibility with v1.0 backup files, and GPS/case-number
+persistence. v1.1 browser verification: vaccine-due and cert-expiry
+banners, K9 Health screen (vaccination badges, weight log with delta),
+Command Tracking screen, GPS capture button and Deployment activity in the
+session editor, and the GPS map link on record detail were all confirmed
+at the phone viewport.
 
-## 1. Automated suite — 53/53 passing
+## 1. Automated suite — 53/53 passing (v1.0 baseline)
 
 Run with `npm test` (Vitest, jsdom, fake-indexeddb). Final run: **7 files,
 53 tests, 0 failures.**

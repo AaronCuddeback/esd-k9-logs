@@ -22,16 +22,20 @@ export default function ProfileScreen() {
     toast("Profile saved");
   };
 
-  const onLogo = (file: File | null) => {
+  const readImage = (file: File | null, apply: (dataUrl: string) => void) => {
     if (!file) return;
     if (file.size > 1024 * 1024) {
-      toast("Logo must be under 1 MB");
+      toast("Image must be under 1 MB");
       return;
     }
     const reader = new FileReader();
-    reader.onload = () => update({ agencyLogoDataUrl: String(reader.result) });
+    reader.onload = () => apply(String(reader.result));
     reader.readAsDataURL(file);
   };
+  const onLogo = (file: File | null) =>
+    readImage(file, (d) => update({ agencyLogoDataUrl: d }));
+  const onK9Photo = (file: File | null) =>
+    readImage(file, (d) => update({ k9PhotoDataUrl: d }));
 
   return (
     <>
@@ -75,6 +79,26 @@ export default function ProfileScreen() {
 
         <div className="card">
           <h3>K9</h3>
+          {s.k9PhotoDataUrl && (
+            <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 12 }}>
+              <img
+                src={s.k9PhotoDataUrl}
+                alt={`Photo of K9 ${s.k9Name || ""}`}
+                style={{ width: 84, height: 84, borderRadius: "50%", objectFit: "cover", border: "2px solid var(--accent)" }}
+              />
+              <button type="button" className="btn small secondary" onClick={() => update({ k9PhotoDataUrl: "" })}>
+                Remove photo
+              </button>
+            </div>
+          )}
+          <Field label={s.k9PhotoDataUrl ? "Replace K9 photo" : "K9 photo (optional)"}>
+            <input
+              type="file"
+              accept="image/png,image/jpeg"
+              aria-label="Upload K9 photo"
+              onChange={(e) => onK9Photo(e.target.files?.[0] ?? null)}
+            />
+          </Field>
           <div className="row">
             <Field label="K9 name" htmlFor="p-k9">
               <input id="p-k9" type="text" value={s.k9Name} onChange={(e) => update({ k9Name: e.target.value })} />
