@@ -1,7 +1,11 @@
 # Test Plan & Results
 
 Delivery verification for ESD K9 Training Logs v1.0.0, 2026-08-16.
-Updated for v1.1 (JDK9-comparison features), same date: suite is now
+Updated for v1.1.1: suite is now **64/64 passing** — `tests/settings.test.tsx`
+adds 5 regression tests (3 unit, 2 component) for the profile-save defect
+described in §3 #10, confirmed to fail against the pre-fix implementation.
+
+Updated for v1.1 (JDK9-comparison features): suite was
 **59/59 passing** — `tests/health.test.ts` adds coverage for the schema-v2
 tables (commands, vaccinations, weights), their backup round-trip,
 backward compatibility with v1.0 backup files, and GPS/case-number
@@ -69,6 +73,7 @@ offline-status banner appears when `navigator.onLine` is false.
 | 7 | Low | Staleness banner showed raw type id ("cluttered") | Shows label ("Cluttered environment") |
 | 8 | Low | "-1d ago" recency badge for a future-dated record | Clamped to "today" |
 | 9 | Low (test-only) | jsdom Blob lacks `.text()`; ExcelJS view typing | Tests adjusted (FileReader; typed view cast) |
+| 10 | **Critical** (found in field use, v1.1.1) | Saving the K9 & handler profile bounced the user back to onboarding and appeared to lose everything. `useSettings()` returns `defaultSettings()` while the Dexie liveQuery resolves; ProfileScreen's guard (`stored.onboarded !== undefined`) is always true for a boolean, so it snapshotted those defaults into local state and `settings.put()` wrote the snapshot wholesale — resetting `onboarded` to false and silently wiping `appPin`, `theme`, `autoLockMinutes`, and every field the screen does not own. Settings and Health screens shared the same race. | Added transactional `updateSettings(patch)` that merges over the stored row (never writes a UI snapshot); ProfileScreen now waits for `loaded` before snapshotting and saves an explicit allowlist of profile fields; Settings, Health, and Onboarding routed through the same merge. Covered by `tests/settings.test.tsx` (5 tests), verified to fail against the old implementation. |
 
 ## 4. Acceptance criteria
 

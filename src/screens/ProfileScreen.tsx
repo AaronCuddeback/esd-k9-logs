@@ -1,24 +1,49 @@
 import { useEffect, useState } from "react";
-import { db, useSettings } from "../hooks";
+import { useSettingsLoaded } from "../hooks";
 import { TopBar } from "../components/shell";
 import { Field, useToast } from "../components/ui";
-import { nowIso } from "../db/db";
+import { updateSettings } from "../db/db";
 import type { AppSettings } from "../db/types";
 
+/** Fields this screen owns. Nothing else is ever written from here. */
+const PROFILE_FIELDS = [
+  "agency",
+  "unit",
+  "agencyLogoDataUrl",
+  "handlerName",
+  "handlerId",
+  "k9Name",
+  "k9Breed",
+  "k9Dob",
+  "k9Id",
+  "k9PhotoDataUrl",
+  "targetOdor",
+  "trainerOrg",
+  "initialCertDate",
+  "currentCertDate",
+  "certExpirationDate"
+] as const satisfies readonly (keyof AppSettings)[];
+
 export default function ProfileScreen() {
-  const stored = useSettings();
+  const { settings: stored, loaded } = useSettingsLoaded();
   const toast = useToast();
   const [s, setS] = useState<AppSettings | null>(null);
 
+  // Snapshot only once the stored row has actually loaded. Snapshotting the
+  // pre-load defaults is what previously let a save wipe unrelated settings.
   useEffect(() => {
-    if (stored.onboarded !== undefined && !s) setS(stored);
-  }, [stored, s]);
+    if (loaded && !s) setS(stored);
+  }, [loaded, stored, s]);
 
   if (!s) return null;
   const update = (patch: Partial<AppSettings>) => setS({ ...s, ...patch });
 
   const save = async () => {
-    await db.settings.put({ ...s, updatedAt: nowIso() });
+    const patch: Partial<AppSettings> = {};
+    for (const key of PROFILE_FIELDS) {
+      Object.assign(patch, { [key]: s[key] });
+    }
+    await updateSettings(patch);
     toast("Profile saved");
   };
 

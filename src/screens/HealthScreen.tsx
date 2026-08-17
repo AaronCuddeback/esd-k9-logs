@@ -7,7 +7,7 @@ import { useState } from "react";
 import { db, useLiveQuery, useSettings } from "../hooks";
 import { TopBar } from "../components/shell";
 import { ConfirmSheet, Field, NumInput, Sheet, useToast } from "../components/ui";
-import { nowIso, uuid } from "../db/db";
+import { nowIso, updateSettings, uuid } from "../db/db";
 import { fmtDate, localDateIso } from "../lib/format";
 import type { AppSettings, VaccinationRecord } from "../db/types";
 
@@ -45,10 +45,6 @@ export default function HealthScreen() {
     async () => (await db.weights.toArray()).sort((a, b) => b.date.localeCompare(a.date)),
     []
   );
-
-  const updateSettings = async (patch: Partial<AppSettings>) => {
-    await db.settings.put({ ...settings, ...patch, updatedAt: nowIso() });
-  };
 
   const saveVax = async (v: VaccinationRecord) => {
     await db.vaccinations.put({ ...v, updatedAt: nowIso() });

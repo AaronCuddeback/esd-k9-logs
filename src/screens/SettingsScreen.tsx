@@ -2,7 +2,7 @@ import { useState } from "react";
 import { db, useLiveQuery, useSettings } from "../hooks";
 import { TopBar } from "../components/shell";
 import { Field, Segmented, Sheet, ToggleRow, useToast } from "../components/ui";
-import { nowIso, uuid } from "../db/db";
+import { updateSettings, uuid } from "../db/db";
 import { hashPin, lockNow, markUnlocked } from "../lib/lock";
 import type { AppSettings } from "../db/types";
 
@@ -17,8 +17,10 @@ export default function SettingsScreen() {
 
   const searchTypes = useLiveQuery(() => db.searchTypes.toArray(), []);
 
+  // Merge-based write: never sends a UI snapshot, so a toggle tapped before
+  // the settings row finishes loading cannot clobber unrelated fields.
   const update = async (patch: Partial<AppSettings>) => {
-    await db.settings.put({ ...s, ...patch, updatedAt: nowIso() });
+    await updateSettings(patch);
   };
 
   const setPin = async () => {

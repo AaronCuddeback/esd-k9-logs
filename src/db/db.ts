@@ -161,3 +161,30 @@ export async function getSettings(database: EsdK9Db = db): Promise<AppSettings> 
   await database.settings.put(d);
   return d;
 }
+
+/**
+ * Merge a patch into the settings row, reading the stored values first.
+ *
+ * Always use this instead of `settings.put({ ...uiState, ...patch })`.
+ * A UI snapshot can be pre-load defaults (liveQuery returns undefined for a
+ * moment), and writing one wholesale silently clobbers everything the
+ * screen does not own — notably `onboarded` (which throws the user back to
+ * onboarding) and `appPin`. Merging over the current row makes that
+ * impossible: fields absent from the patch keep their stored values.
+ */
+export async function updateSettings(
+  patch: Partial<Omit<AppSettings, "id">>,
+  database: EsdK9Db = db
+): Promise<AppSettings> {
+  return database.transaction("rw", database.settings, async () => {
+    const current = (await database.settings.get("app")) ?? defaultSettings();
+    const next: AppSettings = {
+      ...current,
+      ...patch,
+      id: "app",
+      updatedAt: nowIso()
+    };
+    await database.settings.put(next);
+    return next;
+  });
+}

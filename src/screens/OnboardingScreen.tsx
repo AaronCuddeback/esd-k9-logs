@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { db } from "../hooks";
 import { Field, useToast } from "../components/ui";
-import { getSettings, nowIso } from "../db/db";
+import { updateSettings } from "../db/db";
 import { seedDatabase } from "../db/seed";
 
 export default function OnboardingScreen() {
@@ -22,15 +21,12 @@ export default function OnboardingScreen() {
       if (withSample) {
         await seedDatabase();
       } else {
-        const s = await getSettings();
-        await db.settings.put({
-          ...s,
+        await updateSettings({
           onboarded: true,
           agency: agency.trim(),
           handlerName: handlerName.trim(),
           k9Name: k9Name.trim(),
-          k9Breed: k9Breed.trim(),
-          updatedAt: nowIso()
+          k9Breed: k9Breed.trim()
         });
       }
       toast(withSample ? "Sample data loaded — explore freely" : "Welcome!");

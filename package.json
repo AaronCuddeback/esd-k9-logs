@@ -1,7 +1,7 @@
 {
   "name": "esd-k9-logs",
   "private": true,
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Mobile-first offline training log application for Electronic Storage Device Detection K9 teams",
   "type": "module",
   "scripts": {
@@ -24,6 +24,7 @@
     "react-router-dom": "^7.18.2"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.0.1",
     "@testing-library/user-event": "^14.5.2",
     "@types/react": "^18.3.10",
