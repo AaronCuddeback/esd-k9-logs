@@ -10,7 +10,14 @@ import { Stat, useToast } from "../components/ui";
 import { finalizeSession } from "../db/repo";
 import { computeStats } from "../lib/stats";
 import { validateForFinalize, hasErrors } from "../lib/validation";
-import { fmtDate, fmtMinutes, BLINDNESS_LABELS } from "../lib/format";
+import {
+  fmtDate,
+  fmtMinutes,
+  BLINDNESS_LABELS,
+  outcomeLabel,
+  draftEditorPath,
+  isDeployment
+} from "../lib/format";
 import { sessionMinutes } from "../lib/stats";
 
 export default function ReviewFinalizeScreen() {
@@ -66,7 +73,10 @@ export default function ReviewFinalizeScreen() {
 
   return (
     <>
-      <TopBar title="Review & Finalize" back={`/session/${id}`} />
+      <TopBar
+        title="Review & Save"
+        back={draftEditorPath(session.id, session.activityType)}
+      />
       <main className="shell-main">
         <div className="card">
           <h2>
@@ -79,15 +89,40 @@ export default function ReviewFinalizeScreen() {
           {session.objective && <p>{session.objective}</p>}
         </div>
 
-        <div className="stat-grid">
-          <Stat num={stats.exercises} label="Exercises" />
-          <Stat num={stats.hidesPlaced} label="Hides" />
-          <Stat num={stats.confirmedFinds} label="Confirmed finds" />
-          <Stat num={`${stats.misses} / ${stats.falseResponses}`} label="Miss / false" />
-        </div>
+        {isDeployment(session.activityType) ? (
+          <div className="stat-grid">
+            <Stat num={stats.confirmedFinds} label="Devices recovered" />
+            <Stat num={stats.unconfirmedAlerts} label="Unconfirmed alerts" />
+          </div>
+        ) : (
+          <div className="stat-grid">
+            <Stat num={stats.exercises} label="Exercises" />
+            <Stat num={stats.hidesPlaced} label="Hides" />
+            <Stat num={stats.confirmedFinds} label="Confirmed finds" />
+            <Stat num={`${stats.misses} / ${stats.falseResponses}`} label="Miss / false" />
+          </div>
+        )}
 
-        <div className="section-label">Exercises</div>
-        {exercises.map((ex) => {
+        <div className="section-label">
+          {isDeployment(session.activityType) ? "Devices located" : "Exercises"}
+        </div>
+        {isDeployment(session.activityType)
+          ? hides
+              .slice()
+              .sort((a, b) => a.number - b.number)
+              .map((h) => (
+                <div key={h.id} className="list-item" style={{ cursor: "default" }}>
+                  <div className="grow">
+                    <div className="primary">
+                      #{h.number} {h.locationDescription || "Location not recorded"}
+                    </div>
+                    <div className="secondary">
+                      {h.outcome ? outcomeLabel(h.outcome, true) : "No result recorded"}
+                    </div>
+                  </div>
+                </div>
+              ))
+          : exercises.map((ex) => {
           const t = computeStats([session], [ex], hidesByEx.get(ex.id) ?? []);
           return (
             <div key={ex.id} className="list-item" style={{ cursor: "default" }}>
@@ -144,8 +179,9 @@ export default function ReviewFinalizeScreen() {
             />
             <span>
               I, <strong>{settings.handlerName || session.handlerName}</strong>, certify this
-              record accurately reflects the training conducted. Finalizing makes it
-              read-only; later changes require a documented correction.
+              record accurately reflects the{" "}
+              {isDeployment(session.activityType) ? "deployment" : "training"} conducted.
+              Saving makes it read-only; later changes require a documented correction.
             </span>
           </label>
         </div>
@@ -156,9 +192,13 @@ export default function ReviewFinalizeScreen() {
           disabled={hasErrors(issues) || !ack || busy}
           onClick={finalize}
         >
-          {busy ? "Finalizing…" : "Finalize record"}
+          {busy ? "Saving…" : "Save record"}
         </button>
-        <Link to={`/session/${id}`} className="btn ghost block" style={{ marginTop: 8, textDecoration: "none" }}>
+        <Link
+          to={draftEditorPath(session.id, session.activityType)}
+          className="btn ghost block"
+          style={{ marginTop: 10, textDecoration: "none" }}
+        >
           Keep editing
         </Link>
       </main>

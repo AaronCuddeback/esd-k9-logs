@@ -34,9 +34,12 @@ export type HideOutcome =
   | "found_assisted" // correct alert but handler assistance/recheck required
   | "interest_no_indication" // interest shown, no final indication
   | "missed" // K9 passed the hide without locating it
-  | "not_searched"; // hide was placed but the area was not searched
+  | "not_searched" // hide was placed but the area was not searched
+  | "alert_unconfirmed"; // deployment only: K9 alerted, nothing recovered
 
 export type ExerciseResult = "successful" | "needs_work" | "unsatisfactory";
+
+export type ExerciseKind = "training" | "deployment";
 
 export type DeviceType =
   | "cellphone"
@@ -76,6 +79,8 @@ export interface AppSettings {
   vetName: string;
   vetPhone: string;
   k9HealthNotes: string; // allergies, medications, standing conditions
+  /** Show the optional detail fields expanded by default (off = fast entry). */
+  showAdvancedFields: boolean;
   theme: "system" | "light" | "dark";
   dateFormat: "MM/dd/yyyy" | "dd/MM/yyyy" | "yyyy-MM-dd";
   reportHeader: string;
@@ -201,6 +206,13 @@ export interface Exercise {
   id: string;
   sessionId: string;
   order: number;
+  /**
+   * "training" = a training exercise with placed hides (the default, and
+   * what every record created before v1.2 is).
+   * "deployment" = a real operational search; its child records are finds
+   * the K9 located, not hides someone placed.
+   */
+  kind: ExerciseKind;
   searchTypeId: string;
   roomTypes: string[]; // for building searches
   blindness: Blindness;

@@ -3,7 +3,7 @@ import { db, useLiveQuery } from "../hooks";
 import { TopBar } from "../components/shell";
 import { Segmented, Stat, EmptyState } from "../components/ui";
 import { computeStats, daysSince } from "../lib/stats";
-import { BLINDNESS_LABELS, fmtDate, fmtMinutes, localDateIso, pct } from "../lib/format";
+import { BLINDNESS_LABELS, fmtDate, fmtMinutes, isDeployment, localDateIso, pct } from "../lib/format";
 
 type Window = "30" | "90" | "365" | "all";
 
@@ -11,18 +11,24 @@ export default function StatsScreen() {
   const [win, setWin] = useState<Window>("90");
 
   const data = useLiveQuery(async () => {
-    let sessions = await db.sessions.orderBy("date").toArray();
-    sessions = sessions.filter((s) => s.status !== "draft");
+    let all = await db.sessions.orderBy("date").toArray();
+    all = all.filter((s) => s.status !== "draft");
     if (win !== "all") {
       const d = new Date();
       d.setDate(d.getDate() - Number(win));
       const cut = localDateIso(d);
-      sessions = sessions.filter((s) => s.date >= cut);
+      all = all.filter((s) => s.date >= cut);
     }
+    // Training reliability metrics must not be diluted by operational
+    // deployments, where what the K9 failed to find is unknowable.
+    const sessions = all.filter((s) => !isDeployment(s.activityType));
+    const deployments = all.filter((s) => isDeployment(s.activityType));
+    const deploymentIds = deployments.map((s) => s.id);
+    const deploymentHides = await db.hides.where("sessionId").anyOf(deploymentIds).toArray();
     const ids = sessions.map((s) => s.id);
     const exercises = await db.exercises.where("sessionId").anyOf(ids).toArray();
     const hides = await db.hides.where("sessionId").anyOf(ids).toArray();
-    return { sessions, exercises, hides };
+    return { sessions, exercises, hides, deployments, deploymentHides };
   }, [win]);
 
   const searchTypes = useLiveQuery(() => db.searchTypes.toArray(), []);
@@ -102,6 +108,38 @@ export default function StatsScreen() {
               {stats.smallSample && " Small sample — interpret with caution."} These are
               training metrics, not a scientific measure of operational reliability.
             </p>
+
+            {data && data.deployments.length > 0 && (
+              <>
+                <div className="section-label">Deployments (recorded separately)</div>
+                <div className="list-item" style={{ cursor: "default" }}>
+                  <div className="grow">
+                    <div className="primary">
+                      {data.deployments.length} deployment
+                      {data.deployments.length === 1 ? "" : "s"}
+                    </div>
+                    <div className="secondary">
+                      {
+                        data.deploymentHides.filter(
+                          (h) =>
+                            h.outcome === "found_independent" || h.outcome === "found_assisted"
+                        ).length
+                      }{" "}
+                      devices recovered ·{" "}
+                      {
+                        data.deploymentHides.filter((h) => h.outcome === "alert_unconfirmed")
+                          .length
+                      }{" "}
+                      unconfirmed alerts
+                    </div>
+                  </div>
+                </div>
+                <p className="hint" style={{ color: "var(--text-3)", marginTop: 4 }}>
+                  Deployment results are kept out of the training figures above:
+                  in the field there is no way to know what was not found.
+                </p>
+              </>
+            )}
 
             <div className="section-label">By search type</div>
             {Object.entries(stats.bySearchType)

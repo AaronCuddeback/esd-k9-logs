@@ -37,6 +37,24 @@ export function validateForFinalize(
   hidesByExercise: Map<string, Hide[]>
 ): ValidationIssue[] {
   const issues = validateSession(s);
+
+  // A deployment is a record of what actually happened on a real search.
+  // Zero finds is a legitimate, important outcome (area cleared), so the
+  // only hard requirements are the session basics validated above.
+  if (s.activityType === "deployment_training") {
+    for (const ex of exercises) {
+      for (const h of hidesByExercise.get(ex.id) ?? []) {
+        if (!h.outcome)
+          issues.push({
+            field: `find-${h.number}`,
+            message: `Find ${h.number}: record whether the device was recovered.`,
+            severity: "error"
+          });
+      }
+    }
+    return issues;
+  }
+
   if (exercises.length === 0)
     issues.push({
       field: "exercises",
@@ -81,11 +99,13 @@ export function validateForFinalize(
 
 export function validateHide(h: Hide): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
+  // Hide location is good practice but must never block fast entry — a
+  // handler logging a box drill between runs should not be stopped for it.
   if (!h.locationDescription.trim())
     issues.push({
       field: "locationDescription",
-      message: "Describe where the hide was placed.",
-      severity: "error"
+      message: "Consider noting where the hide was placed.",
+      severity: "warning"
     });
   if (h.placedTime && !TIME_RE.test(h.placedTime))
     issues.push({ field: "placedTime", message: "Placed time must be HH:MM.", severity: "error" });

@@ -8,23 +8,40 @@ Open the app → choose **Set up my team** (enter handler, K9, agency — all
 editable later) or **Explore with sample data** to look around with the
 fictional K9 Cooper dataset first.
 
+## Logging a deployment (a real search)
+
+1. **＋ New Session** → tap **Deployment** → tap the location.
+2. Enter the case / warrant number.
+3. Tap the areas you searched (residence, vehicle, storage unit…).
+4. For each device the K9 located, tap **＋ Add device located**, pick the
+   device type, note where it was, and confirm **Device recovered** or
+   **Nothing found** (an alert that produced nothing — log it honestly).
+5. If the K9 searched and located nothing at all, add no devices: a cleared
+   search is a valid record and saves without complaint.
+6. **Finish & save record**.
+
+Deployments never ask for hides, blindness, reward cups or drill ratings,
+and their results are reported separately from your training statistics.
+
 ## Logging a training session (the 60-second version)
 
-1. Tap **＋ New Session** (big green button, bottom right).
-2. Tap a recent location — or type a new one — the session starts with
-   date, time, handler, and K9 already filled in. **Repeat last session's
-   setup** copies your previous exercises and hide placements with results
-   cleared.
-3. Tap **＋ Add exercise**, pick the search type (room, vehicle, parcel,
-   boxes, blank…), set blindness (known / single-blind / double-blind).
-4. Tap **＋ Quick-add hide** for each hide: device type chip, where it was
-   placed, then tap the outcome (✓ Found / ✓ Assisted / Interest / ✗ Missed).
-5. Record false responses with the dedicated button on the exercise —
-   location and suspected cause. Record blank-search results the same way.
-6. Cups, ratings, times, environment, and welfare are all optional — fill
-   what matters, skip the rest. Use the keyboard's microphone for notes.
-7. Back on the session: **Review & finalize** → check the acknowledgment →
-   **Finalize record**.
+1. Tap **＋ New Session** (big green button, bottom right) → **Training** is
+   already selected → tap a recent location. Date, time, handler and K9 fill
+   themselves in.
+2. Tap **＋ Add exercise**. The search type and blindness carry over from
+   your previous exercise, so a repeat drill needs no changes at all.
+3. Use the **＋ / −** stepper to set how many hides you placed. Each hide
+   appears with big **✓ Found** / **✗ Missed** buttons — one tap each.
+   Smaller buttons underneath cover *With help*, *Interest only* and
+   *Not searched* when you need them.
+4. Add a false response with the button on the exercise if one occurred.
+5. Tap **Done**, add session notes if you want, then **Finish & save
+   record** → tick the acknowledgment → **Save record**.
+
+A three-hide box drill is roughly ten taps end to end. Everything else —
+times, cups, leash, cueing, conditions, welfare, objective, ratings — lives
+in the collapsed sections and is entirely optional. Turn on Settings →
+*Show all detail fields* if you would rather have them open by default.
 
 Everything autosaves as you type. If the phone dies, the app is killed, or
 you get called out mid-entry, the draft is waiting on the Home screen when

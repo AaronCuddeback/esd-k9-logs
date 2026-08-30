@@ -5,6 +5,7 @@
  * captures a field-level before/after audit entry.
  */
 import { db, nowIso, uuid, type EsdK9Db } from "./db";
+import { newExercise } from "./factories";
 import type {
   Exercise,
   Hide,
@@ -364,6 +365,45 @@ export async function duplicateSessionSetup(
       return fresh.id;
     }
   );
+}
+
+
+// ---------- deployments ----------
+
+/**
+ * Deployments are stored in the same tables as training so that history,
+ * exports, revisions and backups keep working unchanged. A deployment
+ * session owns exactly one container exercise (kind "deployment") whose
+ * child records are the finds the K9 actually located.
+ *
+ * Legacy note: deployment sessions created before v1.2 may already have one
+ * or more training-shaped exercises. This reuses the first one rather than
+ * creating a duplicate, so no earlier record is orphaned or altered.
+ */
+export async function getOrCreateDeploymentExercise(
+  sessionId: string,
+  database: EsdK9Db = db
+): Promise<Exercise> {
+  return database.transaction("rw", database.exercises, async () => {
+    const existing = await database.exercises
+      .where("sessionId")
+      .equals(sessionId)
+      .sortBy("order");
+    if (existing.length > 0) return existing[0];
+    const ex = newExercise(sessionId, 1, "deployment");
+    ex.blindness = "double_blind"; // nobody knows where devices are on a real search
+    await database.exercises.put(ex);
+    return ex;
+  });
+}
+
+/** Every find recorded on a deployment session, ordered. */
+export async function listDeploymentFinds(
+  sessionId: string,
+  database: EsdK9Db = db
+): Promise<Hide[]> {
+  const hides = await database.hides.where("sessionId").equals(sessionId).toArray();
+  return hides.sort((a, b) => a.number - b.number);
 }
 
 export async function listRevisions(

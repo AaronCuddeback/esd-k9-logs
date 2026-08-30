@@ -3,7 +3,7 @@ import { db, useLiveQuery, useSettings } from "../hooks";
 import { TopBar, OfflineBanner } from "../components/shell";
 import { Stat, StatusBadge, EmptyState } from "../components/ui";
 import { computeStats, daysSince } from "../lib/stats";
-import { fmtDate, fmtMinutes, localDateIso } from "../lib/format";
+import { draftEditorPath, fmtDate, fmtMinutes, localDateIso } from "../lib/format";
 import { seedDatabase, isDatabaseEmpty } from "../db/seed";
 import { useState } from "react";
 
@@ -110,7 +110,11 @@ export default function HomeScreen() {
           <div className="card" style={{ borderColor: "var(--warn)" }}>
             <h3>Unfinished draft{drafts.length > 1 ? "s" : ""}</h3>
             {drafts.map((d) => (
-              <Link key={d.id} className="list-item flat" to={`/session/${d.id}`}>
+              <Link
+                key={d.id}
+                className="list-item flat"
+                to={draftEditorPath(d.id, d.activityType)}
+              >
                 <div className="grow">
                   <div className="primary">
                     {fmtDate(d.date, settings.dateFormat)} — {d.locationName || "No location yet"}
@@ -189,7 +193,7 @@ export default function HomeScreen() {
           <Link
             key={s.id}
             className="list-item"
-            to={s.status === "draft" ? `/session/${s.id}` : `/record/${s.id}`}
+            to={s.status === "draft" ? draftEditorPath(s.id, s.activityType) : `/record/${s.id}`}
           >
             <div className="grow">
               <div className="primary">

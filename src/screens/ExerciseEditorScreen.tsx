@@ -1,37 +1,50 @@
 /**
- * Exercise editor: search type, blindness, blank-search handling, hides list
- * with one-tap outcome recording, false responses, performance ratings,
- * reward tracking. Autosaves for drafts; correction mode records an audit
- * entry with before/after values.
+ * Exercise editor, optimised for logging during or right after a run.
+ *
+ * The fast path is: pick a search type, set how many hides with the
+ * stepper, tap Found/Missed on each. Everything else (timing, reward,
+ * cueing, ratings, notes) is collapsed — per-exercise ratings in
+ * particular are redundant with the session assessment for routine work,
+ * so they are off by default but still available for evaluations.
  */
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { db, useAutosave, useLiveQuery, useSettings } from "../hooks";
 import { TopBar } from "../components/shell";
 import {
   ChipSelect,
+  Collapse,
   ConfirmSheet,
   Field,
   NumInput,
+  OutcomePicker,
   RatingBar,
   Segmented,
   Sheet,
+  Stepper,
   ToggleRow,
-  YesNo,
   useToast
 } from "../components/ui";
-import type { Blindness, Exercise, ExerciseResult, HideOutcome } from "../db/types";
+import type { Blindness, Exercise, ExerciseResult, Hide, HideOutcome } from "../db/types";
 import { uuid, ROOM_TYPES } from "../db/db";
 import { newHide } from "../db/factories";
 import { deleteHide, diffFlat, recordChildCorrection, saveExercise, saveHide } from "../db/repo";
-import { OUTCOME_LABELS, DEVICE_LABELS } from "../lib/format";
+import { DEVICE_LABELS } from "../lib/format";
 
-const OUTCOME_ORDER: HideOutcome[] = [
-  "found_independent",
-  "found_assisted",
-  "interest_no_indication",
-  "missed",
-  "not_searched"
+const QUICK_DEVICES: { value: string; label: string }[] = [
+  { value: "cellphone", label: "Cellphone" },
+  { value: "usb_drive", label: "USB drive" },
+  { value: "sd_card", label: "SD card" },
+  { value: "micro_sd", label: "MicroSD" },
+  { value: "sim_card", label: "SIM card" },
+  { value: "hard_drive", label: "Hard drive" },
+  { value: "ssd", label: "SSD" },
+  { value: "tablet", label: "Tablet" },
+  { value: "laptop", label: "Laptop" },
+  { value: "dvr", label: "DVR" },
+  { value: "game_console", label: "Game console" },
+  { value: "training_aid_odor", label: "Odor aid" },
+  { value: "other", label: "Other" }
 ];
 
 export default function ExerciseEditorScreen() {
@@ -46,7 +59,10 @@ export default function ExerciseEditorScreen() {
   const stored = useLiveQuery(() => db.exercises.get(exId!), [exId]);
   const session = useLiveQuery(() => db.sessions.get(id!), [id]);
   const hides = useLiveQuery(
-    async () => (await db.hides.where("exerciseId").equals(exId!).toArray()).sort((a, b) => a.number - b.number),
+    async () =>
+      (await db.hides.where("exerciseId").equals(exId!).toArray()).sort(
+        (a, b) => a.number - b.number
+      ),
     [exId]
   );
   const searchTypes = useLiveQuery(
@@ -59,8 +75,7 @@ export default function ExerciseEditorScreen() {
   const [frSheet, setFrSheet] = useState(false);
   const [frLoc, setFrLoc] = useState("");
   const [frCause, setFrCause] = useState("");
-  const [frHandler, setFrHandler] = useState("No reward given; moved on");
-  const [deleteHideId, setDeleteHideId] = useState<string | null>(null);
+  const [confirmRemoveHide, setConfirmRemoveHide] = useState<Hide | null>(null);
   const [reasonSheet, setReasonSheet] = useState(false);
   const [reason, setReason] = useState("");
 
@@ -87,24 +102,39 @@ export default function ExerciseEditorScreen() {
     return (
       <>
         <TopBar title="Exercise" back={`/session/${id}${suffix}`} />
-        <main className="shell-main"><p>Loading…</p></main>
+        <main className="shell-main">
+          <p>Loading…</p>
+        </main>
       </>
     );
   }
 
   const addHide = async () => {
-    await flushNow(ex);
     const h = newHide(ex.id, ex.sessionId, (hides[hides.length - 1]?.number ?? 0) + 1);
     h.placedBy = session.trainerName || session.handlerName;
     h.handlerKnewLocation = ex.blindness === "known";
+    // repeat the previous hide's device — most drills use the same aid
+    if (hides.length > 0) h.deviceType = hides[hides.length - 1].deviceType;
     await saveHide(h);
-    navigate(`/session/${id}/exercise/${exId}/hide/${h.id}${suffix}`);
   };
 
-  const setOutcome = async (hideId: string, outcome: HideOutcome) => {
-    const h = hides.find((x) => x.id === hideId);
-    if (!h) return;
-    await saveHide({ ...h, outcome });
+  const removeLastHide = async () => {
+    const last = hides[hides.length - 1];
+    if (!last) return;
+    if (last.outcome || last.locationDescription.trim() || last.notes.trim()) {
+      setConfirmRemoveHide(last);
+      return;
+    }
+    await deleteHide(last.id);
+  };
+
+  const setHideCount = async (n: number) => {
+    if (n > hides.length) await addHide();
+    else if (n < hides.length) await removeLastHide();
+  };
+
+  const patchHide = async (h: Hide, patch: Partial<Hide>) => {
+    await saveHide({ ...h, ...patch });
   };
 
   const addFalseResponse = () => {
@@ -112,7 +142,12 @@ export default function ExerciseEditorScreen() {
     update({
       falseResponses: [
         ...ex.falseResponses,
-        { id: uuid(), locationDescription: frLoc.trim(), suspectedCause: frCause.trim(), handlerResponse: frHandler.trim() }
+        {
+          id: uuid(),
+          locationDescription: frLoc.trim(),
+          suspectedCause: frCause.trim(),
+          handlerResponse: "No reward given"
+        }
       ]
     });
     setFrLoc("");
@@ -123,16 +158,15 @@ export default function ExerciseEditorScreen() {
   const saveCorrection = async () => {
     try {
       if (!original) return;
-      const changes = diffFlat(original, ex);
       await recordChildCorrection(
         ex.sessionId,
         settings.handlerName || "Handler",
         reason,
         `Exercise ${ex.order}`,
-        changes
+        diffFlat(original, ex)
       );
       await saveExercise(ex);
-      toast("Correction saved with audit entry");
+      toast("Correction saved");
       setReasonSheet(false);
       navigate(`/session/${id}${suffix}`);
     } catch (e) {
@@ -140,279 +174,277 @@ export default function ExerciseEditorScreen() {
     }
   };
 
+  const showAdvanced = settings.showAdvancedFields;
+
   return (
     <>
       <TopBar title={`Exercise ${ex.order}`} back={`/session/${id}${suffix}`} />
       <main className="shell-main">
+        {/* --- what kind of search --- */}
         <div className="card">
-          <Field label="Search type">
-            <div className="chips" role="group" aria-label="Search type">
+          {/* A native picker keeps 11+ search types to a single row instead
+              of a wall of chips; it is also pre-filled from the previous
+              exercise, so most sessions never touch it. */}
+          <Field label="Search type" htmlFor="ex-type">
+            <select
+              id="ex-type"
+              value={ex.searchTypeId}
+              onChange={(e) =>
+                update({
+                  searchTypeId: e.target.value,
+                  isBlankSearch: e.target.value === "blank" ? true : ex.isBlankSearch
+                })
+              }
+            >
               {searchTypes?.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  className="chip"
-                  aria-pressed={ex.searchTypeId === t.id}
-                  onClick={() =>
-                    update({ searchTypeId: t.id, isBlankSearch: t.id === "blank" ? true : ex.isBlankSearch })
-                  }
-                >
+                <option key={t.id} value={t.id}>
                   {t.label}
-                </button>
+                </option>
               ))}
-            </div>
+            </select>
           </Field>
-          {(ex.searchTypeId === "room" || ex.searchTypeId === "cluttered") && (
-            <Field label="Type of rooms">
-              <ChipSelect
-                ariaLabel="Room types"
-                values={ex.roomTypes}
-                options={ROOM_TYPES.map((r) => ({ value: r, label: r }))}
-                onChange={(v) => update({ roomTypes: v })}
-              />
-            </Field>
-          )}
-          <Field label="Hide knowledge" hint="Double-blind: nobody present knows the placements.">
+          <Field label="Hide knowledge">
             <Segmented<Blindness>
               ariaLabel="Blindness level"
               value={ex.blindness}
               options={[
                 { value: "known", label: "Known" },
-                { value: "single_blind", label: "Single-blind" },
+                { value: "single_blind", label: "Blind" },
                 { value: "double_blind", label: "Double-blind" }
               ]}
               onChange={(v) => update({ blindness: v })}
             />
           </Field>
           <ToggleRow
-            label="Blank / negative search"
-            sub="This area deliberately contains no target odor"
+            label="Blank search"
+            sub="No target odor placed in this area"
             checked={ex.isBlankSearch}
-            onChange={(v) => update({ isBlankSearch: v, blankCorrect: v ? ex.blankCorrect : null })}
+            onChange={(v) =>
+              update({ isBlankSearch: v, blankCorrect: v ? ex.blankCorrect : null })
+            }
           />
           {ex.isBlankSearch && (
-            <Field label="Blank-search result">
+            <Field label="Blank result">
               <Segmented
                 ariaLabel="Blank search result"
                 value={ex.blankCorrect === null ? "unset" : ex.blankCorrect ? "clear" : "false"}
                 options={[
-                  { value: "unset", label: "Not recorded" },
-                  { value: "clear", label: "Correctly cleared" },
-                  { value: "false", label: "False response" }
+                  { value: "clear", label: "✓ Cleared" },
+                  { value: "false", label: "✗ False response" },
+                  { value: "unset", label: "—" }
                 ]}
-                onChange={(v) =>
-                  update({ blankCorrect: v === "unset" ? null : v === "clear" })
-                }
+                onChange={(v) => update({ blankCorrect: v === "unset" ? null : v === "clear" })}
               />
             </Field>
           )}
-          <Field label="Area description" htmlFor="ex-area">
-            <input
-              id="ex-area"
-              type="text"
-              value={ex.areaDescription}
-              placeholder="e.g., Three offices, second floor"
-              onChange={(e) => update({ areaDescription: e.target.value })}
-            />
-          </Field>
         </div>
 
+        {/* --- hides + outcomes, the fast path --- */}
         {!ex.isBlankSearch && (
           <div className="card">
-            <h3>Hides ({hides.length})</h3>
+            <Stepper
+              label="How many hides?"
+              value={hides.length}
+              onChange={setHideCount}
+              min={0}
+              max={30}
+            />
             {hides.map((h) => (
-              <div key={h.id} className="card flat" style={{ padding: 10, marginBottom: 8 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Link
-                    to={`/session/${id}/exercise/${exId}/hide/${h.id}${suffix}`}
-                    className="grow"
-                    style={{ textDecoration: "none", color: "inherit", flex: 1, minWidth: 0 }}
+              <div
+                key={h.id}
+                className="card flat"
+                style={{ padding: 12, marginBottom: 12, background: "var(--surface-2)" }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                  <strong style={{ minWidth: 28 }}>#{h.number}</strong>
+                  <select
+                    aria-label={`Device for hide ${h.number}`}
+                    value={h.deviceType}
+                    onChange={(e) =>
+                      patchHide(h, { deviceType: e.target.value as Hide["deviceType"] })
+                    }
+                    style={{ flex: 1, minHeight: 48 }}
                   >
-                    <div className="primary" style={{ fontWeight: 600 }}>
-                      #{h.number} · {h.deviceType === "other" ? h.deviceTypeOther || "Other" : DEVICE_LABELS[h.deviceType]}
-                    </div>
-                    <div className="secondary" style={{ color: "var(--text-2)", fontSize: "var(--fs-sm)" }}>
-                      {h.locationDescription || "Tap to add details"}
-                    </div>
-                  </Link>
-                  {isDraft && (
-                    <button
-                      type="button"
-                      className="icon-btn"
-                      aria-label={`Delete hide ${h.number}`}
-                      onClick={() => setDeleteHideId(h.id)}
-                    >
-                      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                        <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
-                      </svg>
-                    </button>
-                  )}
+                    {QUICK_DEVICES.map((d) => (
+                      <option key={d.value} value={d.value}>
+                        {d.label}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    aria-label={`More detail for hide ${h.number}`}
+                    onClick={() =>
+                      navigate(`/session/${id}/exercise/${exId}/hide/${h.id}${suffix}`)
+                    }
+                  >
+                    ✏️
+                  </button>
                 </div>
-                <div className="seg" style={{ marginTop: 8 }} role="group" aria-label={`Outcome for hide ${h.number}`}>
-                  {OUTCOME_ORDER.map((o) => (
-                    <button
-                      key={o}
-                      type="button"
-                      aria-pressed={h.outcome === o}
-                      onClick={() => setOutcome(h.id, o)}
-                      title={OUTCOME_LABELS[o]}
-                    >
-                      {o === "found_independent" ? "✓ Found" :
-                       o === "found_assisted" ? "✓ Assisted" :
-                       o === "interest_no_indication" ? "Interest" :
-                       o === "missed" ? "✗ Missed" : "Not searched"}
-                    </button>
-                  ))}
-                </div>
+                <OutcomePicker
+                  label={`Outcome for hide ${h.number}`}
+                  value={h.outcome}
+                  onChange={(v) => patchHide(h, { outcome: v as HideOutcome })}
+                />
               </div>
             ))}
-            <button type="button" className="btn secondary block" onClick={addHide}>
-              ＋ Quick-add hide
-            </button>
+            {hides.length === 0 && (
+              <p style={{ color: "var(--text-2)", fontSize: "var(--fs-sm)" }}>
+                Tap + to add the hides you placed, then mark each found or missed.
+              </p>
+            )}
           </div>
         )}
 
+        {/* --- false responses stay one tap away: court-critical --- */}
         <div className="card">
-          <h3>False responses ({ex.falseResponses.length})</h3>
-          <p style={{ color: "var(--text-2)", fontSize: "var(--fs-sm)" }}>
-            A final response where no target odor was present. Recording these is
-            essential for defensible records.
-          </p>
-          {ex.falseResponses.map((f) => (
-            <div key={f.id} className="list-item" style={{ cursor: "default" }}>
-              <div className="grow">
-                <div className="primary">{f.locationDescription}</div>
-                {f.suspectedCause && <div className="secondary">Cause: {f.suspectedCause}</div>}
-              </div>
-              <button
-                type="button"
-                className="icon-btn"
-                aria-label={`Remove false response at ${f.locationDescription}`}
-                onClick={() =>
-                  update({ falseResponses: ex.falseResponses.filter((x) => x.id !== f.id) })
-                }
-              >
-                ✕
-              </button>
-            </div>
-          ))}
-          <button type="button" className="btn secondary block" onClick={() => setFrSheet(true)}>
-            ＋ Record false response
-          </button>
-        </div>
-
-        <div className="card">
-          <h3>Timing &amp; handling</h3>
-          <div className="row">
-            <Field label="Search time (min)" htmlFor="ex-time">
-              <NumInput
-                id="ex-time"
-                value={ex.searchTimeSeconds != null ? Math.round(ex.searchTimeSeconds / 60) : null}
-                min={0}
-                onChange={(v) => update({ searchTimeSeconds: v != null ? v * 60 : null })}
-              />
-            </Field>
-            <Field label="First find (min)" htmlFor="ex-first">
-              <NumInput
-                id="ex-first"
-                value={ex.timeToFirstFindSeconds != null ? Math.round(ex.timeToFirstFindSeconds / 60) : null}
-                min={0}
-                onChange={(v) => update({ timeToFirstFindSeconds: v != null ? v * 60 : null })}
-              />
-            </Field>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+            <strong>False responses</strong>
+            <button type="button" className="btn small secondary" onClick={() => setFrSheet(true)}>
+              ＋ Add
+            </button>
           </div>
-          <ToggleRow label="Off leash" checked={ex.offLeash} onChange={(v) => update({ offLeash: v })} />
-          <Field label="Final response type" htmlFor="ex-final">
-            <input
-              id="ex-final"
-              type="text"
-              value={ex.finalResponseType}
-              placeholder="Sit (passive)…"
-              onChange={(e) => update({ finalResponseType: e.target.value })}
-            />
-          </Field>
-          <Field label="Handler cueing / assistance">
-            <Segmented
-              ariaLabel="Handler cueing"
-              value={ex.handlerCueing || "unset"}
-              options={[
-                { value: "unset", label: "—" },
-                { value: "None", label: "None" },
-                { value: "Minimal", label: "Minimal" },
-                { value: "Directed recheck", label: "Recheck" },
-                { value: "Significant", label: "Significant" }
-              ]}
-              onChange={(v) => update({ handlerCueing: v === "unset" ? "" : v })}
-            />
-          </Field>
-          <Field label="Search strategy notes" htmlFor="ex-strategy">
-            <input
-              id="ex-strategy"
-              type="text"
-              value={ex.handlerStrategy}
-              placeholder="Perimeter first, then detail…"
-              onChange={(e) => update({ handlerStrategy: e.target.value })}
-            />
-          </Field>
-        </div>
-
-        <div className="card">
-          <h3>Reward</h3>
-          <Field label="Reward type">
-            <Segmented
-              ariaLabel="Reward type"
-              value={ex.rewardType || "unset"}
-              options={[
-                { value: "food", label: "Food" },
-                { value: "toy", label: "Toy" },
-                { value: "praise", label: "Praise" },
-                { value: "unset", label: "None" }
-              ]}
-              onChange={(v) => update({ rewardType: v === "unset" ? "" : v })}
-            />
-          </Field>
-          {ex.rewardType === "food" && (
-            <Field label="Food cups given" htmlFor="ex-cups" hint="ESD K9s are typically fed through training — cups matter.">
-              <NumInput id="ex-cups" value={ex.rewardCups} min={0} max={20} step={0.5} onChange={(v) => update({ rewardCups: v })} />
-            </Field>
+          {ex.falseResponses.length === 0 ? (
+            <p style={{ color: "var(--text-3)", fontSize: "var(--fs-sm)", margin: "8px 0 0" }}>
+              None recorded.
+            </p>
+          ) : (
+            <div style={{ marginTop: 10 }}>
+              {ex.falseResponses.map((f) => (
+                <div key={f.id} className="list-item" style={{ cursor: "default" }}>
+                  <div className="grow">
+                    <div className="primary">{f.locationDescription}</div>
+                    {f.suspectedCause && <div className="secondary">{f.suspectedCause}</div>}
+                  </div>
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    aria-label={`Remove false response at ${f.locationDescription}`}
+                    onClick={() =>
+                      update({ falseResponses: ex.falseResponses.filter((x) => x.id !== f.id) })
+                    }
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
           )}
-          <YesNo label="Rewarded at source?" value={ex.rewardedAtSource} onChange={(v) => update({ rewardedAtSource: v })} />
         </div>
 
-        <div className="card">
-          <h3>Performance ratings (optional)</h3>
-          <RatingBar label="Search coverage / thoroughness" value={ex.coverage} onChange={(v) => update({ coverage: v as 0 })} />
-          <RatingBar label="Search intensity" value={ex.intensity} onChange={(v) => update({ intensity: v as 0 })} />
-          <RatingBar label="Independence" value={ex.independence} onChange={(v) => update({ independence: v as 0 })} />
-          <RatingBar label="Focus" value={ex.focus} onChange={(v) => update({ focus: v as 0 })} />
-          <RatingBar label="Stamina" value={ex.stamina} onChange={(v) => update({ stamina: v as 0 })} />
-          <RatingBar label="Indication quality" value={ex.indicationQuality} onChange={(v) => update({ indicationQuality: v as 0 })} />
-        </div>
+        {/* --- everything else, collapsed --- */}
+        <div className="card flat">
+          <Collapse title="📝 Notes & result" defaultOpen={showAdvanced}>
+            <Field label="Comments" htmlFor="ex-comments">
+              <textarea
+                id="ex-comments"
+                value={ex.comments}
+                onChange={(e) => update({ comments: e.target.value })}
+              />
+            </Field>
+            <Field label="Exercise result">
+              <Segmented<ExerciseResult | "unset">
+                ariaLabel="Exercise result"
+                value={(ex.result || "unset") as ExerciseResult | "unset"}
+                options={[
+                  { value: "successful", label: "Good" },
+                  { value: "needs_work", label: "Needs work" },
+                  { value: "unsatisfactory", label: "Poor" },
+                  { value: "unset", label: "—" }
+                ]}
+                onChange={(v) => update({ result: v === "unset" ? "" : v })}
+              />
+            </Field>
+            <Field label="Problems / corrective training" htmlFor="ex-problems">
+              <textarea
+                id="ex-problems"
+                value={ex.problems}
+                onChange={(e) => update({ problems: e.target.value })}
+              />
+            </Field>
+          </Collapse>
 
-        <div className="card">
-          <h3>Result</h3>
-          <Field label="Exercise result">
-            <Segmented<ExerciseResult | "unset">
-              ariaLabel="Exercise result"
-              value={(ex.result || "unset") as ExerciseResult | "unset"}
-              options={[
-                { value: "successful", label: "Successful" },
-                { value: "needs_work", label: "Needs work" },
-                { value: "unsatisfactory", label: "Unsatisfactory" },
-                { value: "unset", label: "—" }
-              ]}
-              onChange={(v) => update({ result: v === "unset" ? "" : v })}
+          <Collapse title="⏱ Timing, reward & area" defaultOpen={showAdvanced}>
+            <Field label="Area searched" htmlFor="ex-area">
+              <input
+                id="ex-area"
+                type="text"
+                value={ex.areaDescription}
+                placeholder="e.g., 12-box line"
+                onChange={(e) => update({ areaDescription: e.target.value })}
+              />
+            </Field>
+            {(ex.searchTypeId === "room" || ex.searchTypeId === "cluttered") && (
+              <Field label="Type of rooms">
+                <ChipSelect
+                  ariaLabel="Room types"
+                  values={ex.roomTypes}
+                  options={ROOM_TYPES.map((r) => ({ value: r, label: r }))}
+                  onChange={(v) => update({ roomTypes: v })}
+                />
+              </Field>
+            )}
+            <div className="row">
+              <Field label="Search time (min)" htmlFor="ex-time">
+                <NumInput
+                  id="ex-time"
+                  value={ex.searchTimeSeconds != null ? Math.round(ex.searchTimeSeconds / 60) : null}
+                  min={0}
+                  onChange={(v) => update({ searchTimeSeconds: v != null ? v * 60 : null })}
+                />
+              </Field>
+              <Field label="Food cups" htmlFor="ex-cups">
+                <NumInput
+                  id="ex-cups"
+                  value={ex.rewardCups}
+                  min={0}
+                  max={20}
+                  step={0.5}
+                  onChange={(v) => update({ rewardCups: v })}
+                />
+              </Field>
+            </div>
+            <ToggleRow
+              label="Off leash"
+              checked={ex.offLeash}
+              onChange={(v) => update({ offLeash: v })}
             />
-          </Field>
-          <Field label="Problems encountered" htmlFor="ex-problems">
-            <textarea id="ex-problems" value={ex.problems} onChange={(e) => update({ problems: e.target.value })} />
-          </Field>
-          <Field label="Corrective training performed" htmlFor="ex-corrective">
-            <textarea id="ex-corrective" value={ex.correctiveTraining} onChange={(e) => update({ correctiveTraining: e.target.value })} />
-          </Field>
-          <Field label="Comments" htmlFor="ex-comments">
-            <textarea id="ex-comments" value={ex.comments} onChange={(e) => update({ comments: e.target.value })} />
-          </Field>
+            <Field label="Handler cueing">
+              <Segmented
+                ariaLabel="Handler cueing"
+                value={ex.handlerCueing || "unset"}
+                options={[
+                  { value: "unset", label: "—" },
+                  { value: "None", label: "None" },
+                  { value: "Minimal", label: "Minimal" },
+                  { value: "Directed recheck", label: "Recheck" }
+                ]}
+                onChange={(v) => update({ handlerCueing: v === "unset" ? "" : v })}
+              />
+            </Field>
+          </Collapse>
+
+          <Collapse title="📊 Detailed ratings (for evaluations)" defaultOpen={showAdvanced}>
+            <p style={{ color: "var(--text-3)", fontSize: "var(--fs-xs)" }}>
+              Optional. Routine sessions are usually covered by the overall session
+              assessment — these are for certifications and formal evaluations.
+            </p>
+            <RatingBar label="Coverage" value={ex.coverage} onChange={(v) => update({ coverage: v as 0 })} />
+            <RatingBar label="Intensity" value={ex.intensity} onChange={(v) => update({ intensity: v as 0 })} />
+            <RatingBar
+              label="Independence"
+              value={ex.independence}
+              onChange={(v) => update({ independence: v as 0 })}
+            />
+            <RatingBar label="Focus" value={ex.focus} onChange={(v) => update({ focus: v as 0 })} />
+            <RatingBar label="Stamina" value={ex.stamina} onChange={(v) => update({ stamina: v as 0 })} />
+            <RatingBar
+              label="Indication quality"
+              value={ex.indicationQuality}
+              onChange={(v) => update({ indicationQuality: v as 0 })}
+            />
+          </Collapse>
         </div>
 
         {isDraft ? (
@@ -424,7 +456,7 @@ export default function ExerciseEditorScreen() {
               navigate(`/session/${id}`);
             }}
           >
-            Done — back to session
+            Done
           </button>
         ) : (
           <button type="button" className="btn block" onClick={() => setReasonSheet(true)}>
@@ -434,29 +466,38 @@ export default function ExerciseEditorScreen() {
       </main>
 
       <Sheet open={frSheet} onClose={() => setFrSheet(false)} title="Record false response">
-        <Field label="Where did it occur?" htmlFor="fr-loc">
-          <input id="fr-loc" type="text" value={frLoc} onChange={(e) => setFrLoc(e.target.value)} autoFocus />
+        <Field label="Where did it happen?" htmlFor="fr-loc">
+          <input
+            id="fr-loc"
+            type="text"
+            value={frLoc}
+            onChange={(e) => setFrLoc(e.target.value)}
+            autoFocus
+          />
         </Field>
         <Field label="Suspected cause (optional)" htmlFor="fr-cause">
-          <input id="fr-cause" type="text" value={frCause} placeholder="Residual odor, distractor…" onChange={(e) => setFrCause(e.target.value)} />
-        </Field>
-        <Field label="Handler response" htmlFor="fr-handler">
-          <input id="fr-handler" type="text" value={frHandler} onChange={(e) => setFrHandler(e.target.value)} />
+          <input
+            id="fr-cause"
+            type="text"
+            value={frCause}
+            placeholder="Residual odor, distractor…"
+            onChange={(e) => setFrCause(e.target.value)}
+          />
         </Field>
         <button type="button" className="btn block" disabled={!frLoc.trim()} onClick={addFalseResponse}>
-          Add false response
+          Add
         </button>
       </Sheet>
 
       <ConfirmSheet
-        open={deleteHideId !== null}
-        onClose={() => setDeleteHideId(null)}
+        open={confirmRemoveHide !== null}
+        onClose={() => setConfirmRemoveHide(null)}
         onConfirm={async () => {
-          if (deleteHideId) await deleteHide(deleteHideId);
+          if (confirmRemoveHide) await deleteHide(confirmRemoveHide.id);
           toast("Hide removed");
         }}
-        title="Remove this hide?"
-        message="The hide record will be removed from this exercise."
+        title="Remove the last hide?"
+        message="It already has details recorded. Removing it deletes those details."
         confirmLabel="Remove"
         danger
       />

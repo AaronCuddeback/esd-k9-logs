@@ -10,6 +10,7 @@ import HomeScreen from "./screens/HomeScreen";
 import HistoryScreen from "./screens/HistoryScreen";
 import CalendarScreen from "./screens/CalendarScreen";
 import SessionEditorScreen from "./screens/SessionEditorScreen";
+import DeploymentEditorScreen from "./screens/DeploymentEditorScreen";
 import ExerciseEditorScreen from "./screens/ExerciseEditorScreen";
 import HideEditorScreen from "./screens/HideEditorScreen";
 import ReviewFinalizeScreen from "./screens/ReviewFinalizeScreen";
@@ -118,6 +119,7 @@ export default function App() {
           <Route path="/history" element={<HistoryScreen />} />
           <Route path="/calendar" element={<CalendarScreen />} />
           <Route path="/session/:id" element={<SessionEditorScreen />} />
+          <Route path="/deployment/:id" element={<DeploymentEditorScreen />} />
           <Route path="/session/:id/exercise/:exId" element={<ExerciseEditorScreen />} />
           <Route path="/session/:id/exercise/:exId/hide/:hideId" element={<HideEditorScreen />} />
           <Route path="/session/:id/review" element={<ReviewFinalizeScreen />} />

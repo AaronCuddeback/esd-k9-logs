@@ -81,6 +81,16 @@ export default function SettingsScreen() {
         </div>
 
         <div className="card">
+          <h3>Data entry</h3>
+          <ToggleRow
+            label="Show all detail fields"
+            sub="Off keeps forms short — optional sections stay collapsed until you open them"
+            checked={s.showAdvancedFields}
+            onChange={(v) => update({ showAdvancedFields: v })}
+          />
+        </div>
+
+        <div className="card">
           <h3>Security</h3>
           {s.appPin ? (
             <>

@@ -133,6 +133,20 @@ reliability, and the UI/reports say so wherever it appears.
 | gps | Optional `{lat, lon, accuracyM, capturedAt}` captured on-device at the training site. Exported as GPS lat/lon columns and shown as a map link. |
 | caseNumber | Optional case / incident / reference number (shown for non-training activity types; always exported). |
 
+## v1.2 additions
+
+| Field | Meaning |
+| --- | --- |
+| exercises.kind | `training` (a drill with placed hides — the value every pre-v1.2 record receives on upgrade) or `deployment` (container for an operational search's finds). |
+| hides.outcome = `alert_unconfirmed` | Deployment only: the K9 alerted and nothing was recovered. Never counted as a training find or miss; reported separately so unconfirmed field alerts are never hidden. |
+| settings.showAdvancedFields | When off (default) optional sections stay collapsed for fast entry. Purely a display preference — it never changes what is stored. |
+
+**Deployment records.** A deployment session owns one container exercise
+whose child hide records are the devices located. "Missed" is not offered on
+a deployment: in the field there is no way to know what was not there.
+Deployment sessions are excluded from training find-rate statistics for the
+same reason, and shown as their own line on the statistics screen.
+
 ## Other tables
 
 - **locations**: name, address, kind, favorite, useCount, lastUsedAt.

@@ -29,6 +29,8 @@ export interface HideTally {
   misses: number;
   interestOnly: number;
   notSearched: number;
+  /** Deployment only: K9 alerted but nothing was recovered. */
+  unconfirmedAlerts: number;
 }
 
 export interface ExerciseTally {
@@ -59,7 +61,8 @@ export function tallyHides(hides: Hide[]): HideTally {
     assistedFinds: 0,
     misses: 0,
     interestOnly: 0,
-    notSearched: 0
+    notSearched: 0,
+    unconfirmedAlerts: 0
   };
   for (const h of hides) {
     t.hidesPlaced++;
@@ -84,6 +87,11 @@ export function tallyHides(hides: Hide[]): HideTally {
         break;
       case "not_searched":
         t.notSearched++;
+        break;
+      case "alert_unconfirmed":
+        // A deployment alert that produced nothing. Never counted as a find
+        // or a training miss; tracked separately so it is not hidden.
+        t.unconfirmedAlerts++;
         break;
       default:
         // no outcome recorded yet — counted as placed but not searched

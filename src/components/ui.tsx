@@ -368,3 +368,165 @@ export function NumInput({
     />
   );
 }
+
+// ---------- outcome picker ----------
+
+/**
+ * Hide/find outcome. The two decisions a handler makes 95% of the time get
+ * full-width thumb targets; the nuanced-but-court-important outcomes stay
+ * one tap away underneath rather than competing for the same space.
+ */
+export function OutcomePicker({
+  value,
+  onChange,
+  label,
+  mode = "training"
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  label: string;
+  mode?: "training" | "deployment";
+}) {
+  // On a real deployment you cannot know what the K9 failed to find, so
+  // "missed" is meaningless there. The honest pair is: the alert produced a
+  // device, or it did not (an unconfirmed alert, which must still be logged).
+  const secondary =
+    mode === "deployment"
+      ? [{ value: "found_assisted", label: "Located with handler help" }]
+      : [
+          { value: "found_assisted", label: "With help" },
+          { value: "interest_no_indication", label: "Interest only" },
+          { value: "not_searched", label: "Not searched" }
+        ];
+  return (
+    <div role="group" aria-label={label}>
+      <div className="outcome-row">
+        <button
+          type="button"
+          className="outcome-btn found"
+          aria-pressed={value === "found_independent"}
+          onClick={() => onChange("found_independent")}
+        >
+          ✓ {mode === "deployment" ? "Device recovered" : "Found"}
+        </button>
+        <button
+          type="button"
+          className="outcome-btn missed"
+          aria-pressed={value === (mode === "deployment" ? "alert_unconfirmed" : "missed")}
+          onClick={() => onChange(mode === "deployment" ? "alert_unconfirmed" : "missed")}
+        >
+          {mode === "deployment" ? "⚠ Nothing found" : "✗ Missed"}
+        </button>
+      </div>
+      <div className="outcome-more">
+        {secondary.map((o) => (
+          <button
+            key={o.value}
+            type="button"
+            aria-pressed={value === o.value}
+            onClick={() => onChange(o.value)}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------- stepper ----------
+
+export function Stepper({
+  value,
+  onChange,
+  label,
+  min = 0,
+  max = 20
+}: {
+  value: number;
+  onChange: (v: number) => void;
+  label: string;
+  min?: number;
+  max?: number;
+}) {
+  return (
+    <div className="field">
+      <label>{label}</label>
+      <div className="stepper">
+        <button
+          type="button"
+          aria-label={`Decrease ${label}`}
+          disabled={value <= min}
+          onClick={() => onChange(Math.max(min, value - 1))}
+        >
+          −
+        </button>
+        <span className="value" aria-live="polite">
+          {value}
+        </span>
+        <button
+          type="button"
+          aria-label={`Increase ${label}`}
+          disabled={value >= max}
+          onClick={() => onChange(Math.min(max, value + 1))}
+        >
+          +
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ---------- collapsible optional detail ----------
+
+/** Optional fields live in here so the default form stays short. */
+export function Collapse({
+  title,
+  defaultOpen = false,
+  children
+}: {
+  title: string;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <details className="collapse" open={defaultOpen}>
+      <summary>{title}</summary>
+      <div className="collapse-body">{children}</div>
+    </details>
+  );
+}
+
+/** Big tappable choice card. */
+export function BigChoice({
+  icon,
+  title,
+  sub,
+  onClick,
+  pressed
+}: {
+  icon: string;
+  title: string;
+  sub?: string;
+  onClick: () => void;
+  pressed?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      className="big-choice"
+      aria-pressed={pressed}
+      onClick={onClick}
+    >
+      <span className="bc-icon" aria-hidden="true">
+        {icon}
+      </span>
+      <span>
+        <span className="bc-title" style={{ display: "block" }}>
+          {title}
+        </span>
+        {sub && <span className="bc-sub">{sub}</span>}
+      </span>
+    </button>
+  );
+}

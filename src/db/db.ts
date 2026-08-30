@@ -14,7 +14,7 @@ import type {
   WeightEntry
 } from "./types";
 
-export const APP_VERSION = "1.1.0";
+export const APP_VERSION = "1.2.0";
 
 /**
  * Local-first database. Dexie versioning is the migration mechanism:
@@ -74,6 +74,24 @@ export class EsdK9Db extends Dexie {
             if (s.k9HealthNotes === undefined) s.k9HealthNotes = "";
           });
       });
+
+    // v3 (app 1.2): streamlined entry + real deployment records.
+    // Purely additive — every existing exercise becomes kind "training",
+    // which is exactly what it already was, so no record changes meaning.
+    this.version(3).upgrade(async (tx) => {
+      await tx
+        .table("exercises")
+        .toCollection()
+        .modify((e: Partial<Exercise>) => {
+          if (e.kind === undefined) e.kind = "training";
+        });
+      await tx
+        .table("settings")
+        .toCollection()
+        .modify((s: Partial<AppSettings>) => {
+          if (s.showAdvancedFields === undefined) s.showAdvancedFields = false;
+        });
+    });
   }
 }
 
@@ -142,6 +160,7 @@ export function defaultSettings(): AppSettings {
     vetName: "",
     vetPhone: "",
     k9HealthNotes: "",
+    showAdvancedFields: false,
     theme: "system",
     dateFormat: "MM/dd/yyyy",
     reportHeader: "",

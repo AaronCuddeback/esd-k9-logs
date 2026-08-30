@@ -88,11 +88,15 @@ describe("validateForFinalize", () => {
 });
 
 describe("validateHide", () => {
-  it("requires a location description", () => {
+  it("suggests but never requires a location description", () => {
+    // Fast entry matters more than completeness here: a missing hide
+    // location warns, it must not block logging a run.
     const h = newHide("e", "s", 1);
-    expect(hasErrors(validateHide(h))).toBe(true);
+    const issues = validateHide(h);
+    expect(hasErrors(issues)).toBe(false);
+    expect(issues.some((i) => i.severity === "warning")).toBe(true);
     h.locationDescription = "Bookshelf";
-    expect(hasErrors(validateHide(h))).toBe(false);
+    expect(validateHide(h)).toHaveLength(0);
   });
   it("requires description when device type is other", () => {
     const h = newHide("e", "s", 1);

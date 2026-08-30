@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { db, useLiveQuery, useSettings } from "../hooks";
 import { TopBar } from "../components/shell";
 import { StatusBadge } from "../components/ui";
-import { fmtDate, localDateIso } from "../lib/format";
+import { draftEditorPath, fmtDate, localDateIso } from "../lib/format";
 
 export default function CalendarScreen() {
   const settings = useSettings();
@@ -118,7 +118,7 @@ export default function CalendarScreen() {
               <Link
                 key={s.id}
                 className="list-item"
-                to={s.status === "draft" ? `/session/${s.id}` : `/record/${s.id}`}
+                to={s.status === "draft" ? draftEditorPath(s.id, s.activityType) : `/record/${s.id}`}
               >
                 <div className="grow">
                   <div className="primary">{s.locationName || "Unnamed"}</div>

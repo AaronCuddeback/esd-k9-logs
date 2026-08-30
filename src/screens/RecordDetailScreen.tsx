@@ -12,7 +12,7 @@ import { getSettings } from "../db/db";
 import { computeStats, sessionMinutes, tallyHides } from "../lib/stats";
 import {
   ACTIVITY_LABELS, BLINDNESS_LABELS, DEVICE_LABELS, OUTCOME_LABELS,
-  fmtDate, fmtDateTime, fmtMinutes, fmtSeconds
+  draftEditorPath, fmtDate, fmtDateTime, fmtMinutes, fmtSeconds, isDeployment, outcomeLabel
 } from "../lib/format";
 import { AttachmentsCard } from "../components/AttachmentsCard";
 import { buildDetailedReport, pdfBlob } from "../lib/exportPdf";
@@ -77,7 +77,10 @@ export default function RecordDetailScreen() {
 
   return (
     <>
-      <TopBar title="Training Record" back="/history" />
+      <TopBar
+        title={isDeployment(session.activityType) ? "Deployment Record" : "Training Record"}
+        back="/history"
+      />
       <main className="shell-main">
         <div className="card">
           <h2 style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
@@ -137,7 +140,42 @@ export default function RecordDetailScreen() {
           </div>
         )}
 
-        {exercises.map((ex) => {
+        {isDeployment(session.activityType) ? (
+          <div className="card">
+            <h3>Devices located ({hides.filter((h) => h.outcome === "found_independent" || h.outcome === "found_assisted").length})</h3>
+            {hides.length === 0 ? (
+              <p style={{ color: "var(--text-2)" }}>
+                No devices recorded — the searched area was cleared.
+              </p>
+            ) : (
+              hides
+                .slice()
+                .sort((a, b) => a.number - b.number)
+                .map((h) => (
+                  <div key={h.id} className="list-item" style={{ cursor: "default" }}>
+                    <div className="grow">
+                      <div className="primary">
+                        #{h.number}{" "}
+                        {h.deviceType === "other" ? h.deviceTypeOther : DEVICE_LABELS[h.deviceType]}
+                        {" — "}
+                        {h.outcome ? outcomeLabel(h.outcome, true) : "no result"}
+                      </div>
+                      <div className="secondary">
+                        {h.locationDescription}
+                        {h.notes ? ` · ${h.notes}` : ""}
+                      </div>
+                    </div>
+                  </div>
+                ))
+            )}
+            {exercises[0]?.roomTypes.length > 0 && (
+              <p style={{ color: "var(--text-2)", fontSize: "var(--fs-sm)", marginTop: 10 }}>
+                Areas searched: {exercises[0].roomTypes.join(", ")}
+                {exercises[0].areaDescription ? ` — ${exercises[0].areaDescription}` : ""}
+              </p>
+            )}
+          </div>
+        ) : exercises.map((ex) => {
           const exHides = hides.filter((h) => h.exerciseId === ex.id).sort((a, b) => a.number - b.number);
           const t = tallyHides(exHides);
           return (
@@ -207,14 +245,14 @@ export default function RecordDetailScreen() {
           Revision history ({revisions ?? 0})
         </Link>
         {session.status === "draft" && (
-          <Link to={`/session/${session.id}`} className="btn secondary block" style={{ marginTop: 8, textDecoration: "none" }}>
+          <Link to={draftEditorPath(session.id, session.activityType)} className="btn secondary block" style={{ marginTop: 8, textDecoration: "none" }}>
             Continue editing draft
           </Link>
         )}
         {editable && session.status !== "draft" && (
           <>
             <Link
-              to={`/session/${session.id}?correct=1`}
+              to={`${draftEditorPath(session.id, session.activityType)}?correct=1`}
               className="btn secondary block"
               style={{ marginTop: 8, textDecoration: "none" }}
             >

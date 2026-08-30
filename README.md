@@ -15,9 +15,17 @@ backups go only where the handler sends them.
   found (independent), found (handler-assisted), interest without indication,
   missed, not searched — plus per-exercise **false responses** and **blank
   (negative) searches**. Outcomes are never lumped into one "finds" number.
-- **Fast mobile entry**: one-tap start from recent/favorite locations,
-  "repeat last setup", quick-add hides, thumb-sized outcome buttons, chips
-  and segmented controls, autosave with draft recovery, dark & light themes.
+- **Fast mobile entry (v1.2)**: a routine session is location → search type
+  → hide-count stepper → tap Found/Missed per hide. Every optional field
+  (people, objective, conditions, welfare, timing, reward, ratings) sits in
+  collapsed sections, so the default form is short; Settings → *Show all
+  detail fields* expands them permanently for evaluations. One-tap start
+  from recent locations, "repeat last setup", 56px minimum touch targets,
+  autosave with draft recovery, dark & light themes.
+- **Deployments are their own record type (v1.2)**: a real search records
+  *devices located* — not placed "hides" inside "exercises". No blindness
+  level, reward cups or drill ratings; zero finds is a valid, first-class
+  result. Deployment figures are reported separately from training metrics.
 - **Defensible records**: finalize with handler acknowledgment; corrections
   to finalized records require a stated reason and preserve original values
   in a permanent revision history; records can be locked read-only.

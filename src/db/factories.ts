@@ -3,6 +3,7 @@ import { localDateIso } from "../lib/format";
 import type {
   EnvConditions,
   Exercise,
+  ExerciseKind,
   Hide,
   TrainingSession,
   WelfareCheck
@@ -82,12 +83,17 @@ export function newSession(defaults: {
   };
 }
 
-export function newExercise(sessionId: string, order: number): Exercise {
+export function newExercise(
+  sessionId: string,
+  order: number,
+  kind: ExerciseKind = "training"
+): Exercise {
   const ts = nowIso();
   return {
     id: uuid(),
     sessionId,
     order,
+    kind,
     searchTypeId: "room",
     roomTypes: [],
     blindness: "known",

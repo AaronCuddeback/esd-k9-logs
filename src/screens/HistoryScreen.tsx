@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { db, useLiveQuery, useSettings } from "../hooks";
 import { TopBar } from "../components/shell";
 import { EmptyState, Field, Sheet, StatusBadge } from "../components/ui";
-import { fmtDate } from "../lib/format";
+import { draftEditorPath, fmtDate, isDeployment } from "../lib/format";
 import type { RecordStatus } from "../db/types";
 
 export default function HistoryScreen() {
@@ -99,14 +99,14 @@ export default function HistoryScreen() {
           <Link
             key={s.id}
             className="list-item"
-            to={s.status === "draft" ? `/session/${s.id}` : `/record/${s.id}`}
+            to={s.status === "draft" ? draftEditorPath(s.id, s.activityType) : `/record/${s.id}`}
           >
             <div className="grow">
               <div className="primary">
                 {fmtDate(s.date, settings.dateFormat)} — {s.locationName || "Unnamed"}
               </div>
               <div className="secondary">
-                {[...(typesBySession.get(s.id) ?? [])]
+                {isDeployment(s.activityType) ? "🚔 Deployment" : [...(typesBySession.get(s.id) ?? [])]
                   .map((tid) => searchTypes?.find((t) => t.id === tid)?.label ?? tid)
                   .join(", ") || "No exercises"}
                 {s.correctiveFollowUp ? " · needs follow-up" : ""}

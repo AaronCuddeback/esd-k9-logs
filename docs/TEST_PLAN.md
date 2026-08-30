@@ -1,7 +1,15 @@
 # Test Plan & Results
 
 Delivery verification for ESD K9 Training Logs v1.0.0, 2026-08-16.
-Updated for v1.1.1: suite is now **64/64 passing** — `tests/settings.test.tsx`
+Updated for v1.2 (streamlined entry + real deployment records): suite is
+**77/77 passing**. New coverage: `tests/migration.test.ts` builds a
+33-session / ~15-hour database in the OLD v1.1 record shape, opens it with
+the current app, and proves every record, total, setting and legacy field
+value survives the upgrade (plus exports and pre-upgrade backup files still
+work); `tests/deployment.test.ts` covers the deployment container, distinct
+recovered/unconfirmed outcomes, and the lighter finalize rules.
+
+Earlier, for v1.1.1: suite was **64/64 passing** — `tests/settings.test.tsx`
 adds 5 regression tests (3 unit, 2 component) for the profile-save defect
 described in §3 #10, confirmed to fail against the pre-fix implementation.
 
@@ -73,6 +81,7 @@ offline-status banner appears when `navigator.onLine` is false.
 | 7 | Low | Staleness banner showed raw type id ("cluttered") | Shows label ("Cluttered environment") |
 | 8 | Low | "-1d ago" recency badge for a future-dated record | Clamped to "today" |
 | 9 | Low (test-only) | jsdom Blob lacks `.text()`; ExcelJS view typing | Tests adjusted (FileReader; typed view cast) |
+| 11 | Medium (v1.2 design change) | Per-exercise performance ratings, wrap-up prose and next-focus fields made routine 15-minute sessions slow to log; deployments were forced through training-shaped "exercises" and "hides". | Optional fields moved into collapsed sections (Settings → *Show all detail fields* restores them); hide count via stepper with one-tap Found/Missed; deployments given their own editor recording devices located, excluded from training find-rate metrics. Data model change is additive with a v3 migration; verified by `tests/migration.test.ts`. |
 | 10 | **Critical** (found in field use, v1.1.1) | Saving the K9 & handler profile bounced the user back to onboarding and appeared to lose everything. `useSettings()` returns `defaultSettings()` while the Dexie liveQuery resolves; ProfileScreen's guard (`stored.onboarded !== undefined`) is always true for a boolean, so it snapshotted those defaults into local state and `settings.put()` wrote the snapshot wholesale — resetting `onboarded` to false and silently wiping `appPin`, `theme`, `autoLockMinutes`, and every field the screen does not own. Settings and Health screens shared the same race. | Added transactional `updateSettings(patch)` that merges over the stored row (never writes a UI snapshot); ProfileScreen now waits for `loaded` before snapshotting and saves an explicit allowlist of profile fields; Settings, Health, and Onboarding routed through the same merge. Covered by `tests/settings.test.tsx` (5 tests), verified to fail against the old implementation. |
 
 ## 4. Acceptance criteria

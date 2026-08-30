@@ -45,7 +45,7 @@ export const ACTIVITY_LABELS: Record<ActivityType, string> = {
   training: "Training",
   certification: "Certification",
   demonstration: "Demonstration",
-  deployment_training: "Deployment-related training",
+  deployment_training: "Deployment",
   remedial: "Remedial training",
   other: "Other"
 };
@@ -61,8 +61,29 @@ export const OUTCOME_LABELS: Record<HideOutcome, string> = {
   found_assisted: "Found — handler assisted",
   interest_no_indication: "Interest, no indication",
   missed: "Missed",
-  not_searched: "Not searched"
+  not_searched: "Not searched",
+  alert_unconfirmed: "Alert — nothing recovered"
 };
+
+/** Outcome wording for deployment records, where "hides" are real finds. */
+export const DEPLOYMENT_OUTCOME_LABELS: Partial<Record<HideOutcome, string>> = {
+  found_independent: "Device recovered",
+  found_assisted: "Recovered — handler assisted",
+  alert_unconfirmed: "Alert — nothing recovered",
+  interest_no_indication: "Interest, no indication"
+};
+
+/** Outcome label appropriate to the record type. */
+export const outcomeLabel = (outcome: HideOutcome, deployment: boolean) =>
+  (deployment ? DEPLOYMENT_OUTCOME_LABELS[outcome] : undefined) ?? OUTCOME_LABELS[outcome];
+
+/** True when a session is an operational deployment rather than training. */
+export const isDeployment = (activityType: string) =>
+  activityType === "deployment_training";
+
+/** Route to the right editor for a draft record. */
+export const draftEditorPath = (id: string, activityType: string) =>
+  isDeployment(activityType) ? `/deployment/${id}` : `/session/${id}`;
 
 export const STATUS_LABELS: Record<RecordStatus, string> = {
   draft: "Draft",
