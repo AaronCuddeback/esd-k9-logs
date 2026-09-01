@@ -169,6 +169,11 @@ export interface TrainingSession {
   locationId: string | null;
   locationName: string;
   locationAddress: string;
+  /**
+   * Which part of the location was worked, e.g. "Master bedroom, garage".
+   * The location names the site; this names the area searched within it.
+   */
+  areaSearched: string;
   gps: GpsPoint | null;
   caseNumber: string; // case / incident / reference number (optional)
   environment: Environment;

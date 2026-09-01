@@ -58,6 +58,7 @@ export function newSession(defaults: {
     locationId: null,
     locationName: "",
     locationAddress: "",
+    areaSearched: "",
     gps: null,
     caseNumber: "",
     environment: "indoor",

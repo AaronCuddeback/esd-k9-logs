@@ -130,6 +130,29 @@ describe("XLSX workbook", () => {
     expect(found).toBe(true);
   });
 
+  it("exports the session area-searched column", async () => {
+    data.sessions[0].areaSearched = "Master bedroom and garage";
+    const wb = await buildWorkbook(data);
+    const buf = await wb.xlsx.writeBuffer();
+    const readBack = new ExcelJS.Workbook();
+    await readBack.xlsx.load(buf as ArrayBuffer);
+    const ws = readBack.getWorksheet("Sessions")!;
+    const col = colByHeader(ws, "Area searched");
+    let found = false;
+    ws.eachRow((row, n) => {
+      if (n > 1 && String(row.getCell(col).value) === "Master bedroom and garage") found = true;
+    });
+    expect(found).toBe(true);
+  });
+
+  it("tolerates records saved before the area field existed", async () => {
+    // a restored pre-v1.3 backup has sessions with no areaSearched at all
+    delete (data.sessions[0] as Partial<(typeof data.sessions)[number]>).areaSearched;
+    const wb = await buildWorkbook(data);
+    const ws = wb.getWorksheet("Sessions")!;
+    expect(ws.getRow(2).getCell(colByHeader(ws, "Area searched")).value).toBe("");
+  });
+
   it("withholds identity when the setting is off", async () => {
     data.settings = { ...data.settings, includeIdentityInExports: false };
     const wb = await buildWorkbook(data);
@@ -181,6 +204,14 @@ describe("PDF reports", () => {
     expect(text).toContain("Record ID");
     expect(text).toMatch(/Page 1 of \d+/);
     expect(text).toContain("Found — independent");
+  });
+
+  it("includes the area searched on the detailed report", async () => {
+    data.sessions[0].areaSearched = "Second-floor offices";
+    const bundle = bundles.find((b) => b.session.id === data.sessions[0].id)!;
+    const { text } = await pdfText(buildDetailedReport(data, [bundle]));
+    expect(text).toContain("Area searched");
+    expect(text).toContain("Second-floor offices");
   });
 
   it("condensed log lists every session in the range", async () => {

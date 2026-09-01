@@ -196,6 +196,19 @@ export default function SessionEditorScreen() {
               }}
             />
           </Field>
+          <Field
+            label="Area searched (optional)"
+            htmlFor="s-area"
+            hint="Which part of the location — bedroom, garage, back yard…"
+          >
+            <input
+              id="s-area"
+              type="text"
+              value={session.areaSearched ?? ""}
+              placeholder="e.g., Master bedroom and garage"
+              onChange={(e) => update({ areaSearched: e.target.value })}
+            />
+          </Field>
         </div>
 
         {/* --- exercises: the main event --- */}

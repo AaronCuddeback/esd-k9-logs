@@ -133,6 +133,16 @@ reliability, and the UI/reports say so wherever it appears.
 | gps | Optional `{lat, lon, accuracyM, capturedAt}` captured on-device at the training site. Exported as GPS lat/lon columns and shown as a map link. |
 | caseNumber | Optional case / incident / reference number (shown for non-training activity types; always exported). |
 
+## v1.3 additions
+
+| Field | Meaning |
+| --- | --- |
+| sessions.areaSearched | Which part of the location was worked — "Master bedroom and garage", "back yard". The location names the *site*; this names the *area within it*. Optional, searchable from History, and exported as its own Sessions column and a PDF row. Existing records gain an empty string on upgrade. |
+
+Exercises keep their own `areaDescription` for the specific area of that
+one exercise, so a session at "Home" can record "bedroom" on exercise 1 and
+"garage" on exercise 2.
+
 ## v1.2 additions
 
 | Field | Meaning |

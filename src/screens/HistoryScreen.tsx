@@ -43,7 +43,7 @@ export default function HistoryScreen() {
       if (needsFollowUp && !s.correctiveFollowUp.trim()) return false;
       if (type !== "all" && !typesBySession.get(s.id)?.has(type)) return false;
       if (q) {
-        const hay = [s.locationName, s.objective, s.summary, s.trainerName, s.nextFocus, s.correctiveFollowUp]
+        const hay = [s.locationName, s.areaSearched, s.objective, s.summary, s.trainerName, s.nextFocus, s.correctiveFollowUp]
           .join(" ")
           .toLowerCase();
         if (!hay.includes(q)) return false;

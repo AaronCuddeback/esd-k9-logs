@@ -203,6 +203,19 @@ export default function ExerciseEditorScreen() {
               ))}
             </select>
           </Field>
+          <Field
+            label="Area searched (optional)"
+            htmlFor="ex-area"
+            hint="The specific area for this exercise."
+          >
+            <input
+              id="ex-area"
+              type="text"
+              value={ex.areaDescription}
+              placeholder="e.g., Bedroom, 12-box line, rear office"
+              onChange={(e) => update({ areaDescription: e.target.value })}
+            />
+          </Field>
           <Field label="Hide knowledge">
             <Segmented<Blindness>
               ariaLabel="Blindness level"
@@ -365,16 +378,7 @@ export default function ExerciseEditorScreen() {
             </Field>
           </Collapse>
 
-          <Collapse title="⏱ Timing, reward & area" defaultOpen={showAdvanced}>
-            <Field label="Area searched" htmlFor="ex-area">
-              <input
-                id="ex-area"
-                type="text"
-                value={ex.areaDescription}
-                placeholder="e.g., 12-box line"
-                onChange={(e) => update({ areaDescription: e.target.value })}
-              />
-            </Field>
+          <Collapse title="⏱ Timing & reward" defaultOpen={showAdvanced}>
             {(ex.searchTypeId === "room" || ex.searchTypeId === "cluttered") && (
               <Field label="Type of rooms">
                 <ChipSelect

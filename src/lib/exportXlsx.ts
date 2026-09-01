@@ -74,6 +74,7 @@ export async function buildWorkbook(data: ExportDataset): Promise<ExcelJS.Workbo
     { header: "Duration (min)", key: "dur", width: 14 },
     { header: "Activity", key: "activity", width: 16 },
     { header: "Location", key: "loc", width: 28 },
+    { header: "Area searched", key: "area", width: 26 },
     { header: "GPS lat", key: "lat", width: 11 },
     { header: "GPS lon", key: "lon", width: 11 },
     { header: "Case / ref #", key: "caseNum", width: 14 },
@@ -102,6 +103,7 @@ export async function buildWorkbook(data: ExportDataset): Promise<ExcelJS.Workbo
       dur: sessionMinutes(s),
       activity: ACTIVITY_LABELS[s.activityType],
       loc: s.locationName,
+      area: s.areaSearched ?? "",
       lat: s.gps?.lat ?? "",
       lon: s.gps?.lon ?? "",
       caseNum: s.caseNumber,
@@ -356,6 +358,7 @@ export async function buildWorkbook(data: ExportDataset): Promise<ExcelJS.Workbo
   ];
   const dict: [string, string, string][] = [
     ["Sessions", "Session ID", "Stable UUID for the training session. Links to Exercises and Hides sheets."],
+    ["Sessions", "Area searched", "Which part of the location was worked (e.g. bedroom, garage). The Location column names the site."],
     ["Sessions", "Duration (min)", "Calculated as end time minus start time; blank when either time is missing."],
     ["Sessions", "Activity", "Training, Certification, Demonstration, Deployment-related training, Remedial, or Other."],
     ["Sessions", "Overall (1-5)", "Handler's overall session assessment: 1 = poor, 5 = excellent."],

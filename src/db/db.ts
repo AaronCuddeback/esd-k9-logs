@@ -14,7 +14,7 @@ import type {
   WeightEntry
 } from "./types";
 
-export const APP_VERSION = "1.2.0";
+export const APP_VERSION = "1.3.0";
 
 /**
  * Local-first database. Dexie versioning is the migration mechanism:
@@ -90,6 +90,17 @@ export class EsdK9Db extends Dexie {
         .toCollection()
         .modify((s: Partial<AppSettings>) => {
           if (s.showAdvancedFields === undefined) s.showAdvancedFields = false;
+        });
+    });
+
+    // v4 (app 1.3): per-session "area searched" (which part of the site was
+    // worked). Additive: existing records simply gain an empty string.
+    this.version(4).upgrade(async (tx) => {
+      await tx
+        .table("sessions")
+        .toCollection()
+        .modify((s: Partial<TrainingSession>) => {
+          if (s.areaSearched === undefined) s.areaSearched = "";
         });
     });
   }

@@ -28,14 +28,19 @@ and their results are reported separately from your training statistics.
 1. Tap **＋ New Session** (big green button, bottom right) → **Training** is
    already selected → tap a recent location. Date, time, handler and K9 fill
    themselves in.
-2. Tap **＋ Add exercise**. The search type and blindness carry over from
-   your previous exercise, so a repeat drill needs no changes at all.
-3. Use the **＋ / −** stepper to set how many hides you placed. Each hide
+2. Optionally fill **Area searched** under the location — which part of the
+   site you worked ("master bedroom and garage", "back yard"). The location
+   is the place; this is the area within it.
+3. Tap **＋ Add exercise**. The search type and blindness carry over from
+   your previous exercise, so a repeat drill needs no changes at all. Each
+   exercise has its own **Area searched** too, so one session at "Home" can
+   record "bedroom" on exercise 1 and "garage" on exercise 2.
+4. Use the **＋ / −** stepper to set how many hides you placed. Each hide
    appears with big **✓ Found** / **✗ Missed** buttons — one tap each.
    Smaller buttons underneath cover *With help*, *Interest only* and
    *Not searched* when you need them.
-4. Add a false response with the button on the exercise if one occurred.
-5. Tap **Done**, add session notes if you want, then **Finish & save
+5. Add a false response with the button on the exercise if one occurred.
+6. Tap **Done**, add session notes if you want, then **Finish & save
    record** → tick the acknowledgment → **Save record**.
 
 A three-hide box drill is roughly ten taps end to end. Everything else —

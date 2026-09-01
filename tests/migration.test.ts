@@ -264,6 +264,22 @@ describe("upgrading a real handler database (33 sessions, ~15 hours)", () => {
     expect(exercises.every((e) => e.kind === "training")).toBe(true);
   });
 
+  it("backfills the new area-searched field without disturbing locations", async () => {
+    const legacy = await seedLegacy(name);
+    upgraded = new EsdK9Db(name);
+    await upgraded.open();
+    const sessions = await upgraded.sessions.toArray();
+    // every legacy session gains an empty area, and keeps its location
+    expect(sessions.every((s) => s.areaSearched === "")).toBe(true);
+    const before = legacy.sessions[0] as Record<string, unknown>;
+    const after = sessions.find((s) => s.id === before.id)!;
+    expect(after.locationName).toBe(before.locationName);
+    expect(after.locationAddress).toBe(before.locationAddress);
+    // and it is editable afterwards
+    await upgraded.sessions.put({ ...after, areaSearched: "Master bedroom" });
+    expect((await upgraded.sessions.get(after.id))!.areaSearched).toBe("Master bedroom");
+  });
+
   it("preserves settings and adds the new preference without touching the rest", async () => {
     await seedLegacy(name);
     upgraded = new EsdK9Db(name);

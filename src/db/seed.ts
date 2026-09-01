@@ -43,6 +43,7 @@ interface SeedSession {
   end: string;
   location: string;
   address: string;
+  area?: string;
   environment: "indoor" | "outdoor" | "mixed";
   trainer: string;
   objective: string;
@@ -63,6 +64,7 @@ const SEED: SeedSession[] = [
     end: "10:05",
     location: "Fairview Training Annex",
     address: "1200 Commerce Way, Fairview",
+    area: "Second-floor offices and break room",
     environment: "indoor",
     trainer: "Sgt. R. Delgado",
     objective: "Maintenance: room searches with deep-concealment hides; one blank room",
@@ -160,6 +162,7 @@ const SEED: SeedSession[] = [
     end: "11:10",
     location: "Riverbend Elementary (closed for summer)",
     address: "45 School Ln, Riverbend",
+    area: "East wing classrooms, library, teacher lounge",
     environment: "indoor",
     trainer: "Ofc. J. Okafor (hide placer)",
     objective: "Double-blind school scenario: classrooms and library, distractor odors present",
@@ -203,6 +206,7 @@ const SEED: SeedSession[] = [
     end: "08:40",
     location: "Cedar Hollow Park",
     address: "Trailhead lot, Cedar Hollow",
+    area: "Tree line and picnic area",
     environment: "outdoor",
     trainer: HANDLER,
     objective: "Outdoor area search; buried and surface hides along tree line",
@@ -407,6 +411,7 @@ export async function seedDatabase(database: EsdK9Db = db): Promise<void> {
     session.endTime = s.end;
     session.locationName = s.location;
     session.locationAddress = s.address;
+    session.areaSearched = s.area ?? "";
     session.environment = s.environment;
     session.trainerName = s.trainer;
     session.objective = s.objective;

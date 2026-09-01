@@ -158,6 +158,7 @@ function renderSessionDetail(
       ["Activity", ACTIVITY_LABELS[session.activityType] + (session.activityOther ? ` — ${session.activityOther}` : "")],
       ["Time", `${session.startTime || "—"} to ${session.endTime || "—"} (${fmtMinutes(sessionMinutes(session))})`],
       ["Location", `${session.locationName}${session.locationAddress ? `, ${session.locationAddress}` : ""} (${session.environment})`],
+      ["Area searched", session.areaSearched ?? ""],
       [
         "GPS",
         session.gps

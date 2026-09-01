@@ -1,7 +1,12 @@
 # Test Plan & Results
 
 Delivery verification for ESD K9 Training Logs v1.0.0, 2026-08-16.
-Updated for v1.2 (streamlined entry + real deployment records): suite is
+Updated for v1.3: suite is **81/81 passing** — the session-level
+"area searched" field is covered by a v4 migration backfill test (legacy
+sessions gain an empty area, locations untouched, field then editable) plus
+XLSX column, PDF row, and pre-v1.3-record tolerance tests.
+
+Updated for v1.2 (streamlined entry + real deployment records): suite was
 **77/77 passing**. New coverage: `tests/migration.test.ts` builds a
 33-session / ~15-hour database in the OLD v1.1 record shape, opens it with
 the current app, and proves every record, total, setting and legacy field
@@ -81,6 +86,7 @@ offline-status banner appears when `navigator.onLine` is false.
 | 7 | Low | Staleness banner showed raw type id ("cluttered") | Shows label ("Cluttered environment") |
 | 8 | Low | "-1d ago" recency badge for a future-dated record | Clamped to "today" |
 | 9 | Low (test-only) | jsdom Blob lacks `.text()`; ExcelJS view typing | Tests adjusted (FileReader; typed view cast) |
+| 12 | Medium (found in field use, v1.3) | The v1.2 streamlining pass hid the exercise "Area" inside a collapsed section and offered no way at all to describe *which part* of a location was searched, so a session at "Home" could not record "bedroom" or "back yard". | Added `sessions.areaSearched` (visible directly under Location) and restored the exercise-level area field to the top of the exercise form. Both are optional, searchable, and exported. Additive v4 migration; covered by migration and export tests. |
 | 11 | Medium (v1.2 design change) | Per-exercise performance ratings, wrap-up prose and next-focus fields made routine 15-minute sessions slow to log; deployments were forced through training-shaped "exercises" and "hides". | Optional fields moved into collapsed sections (Settings → *Show all detail fields* restores them); hide count via stepper with one-tap Found/Missed; deployments given their own editor recording devices located, excluded from training find-rate metrics. Data model change is additive with a v3 migration; verified by `tests/migration.test.ts`. |
 | 10 | **Critical** (found in field use, v1.1.1) | Saving the K9 & handler profile bounced the user back to onboarding and appeared to lose everything. `useSettings()` returns `defaultSettings()` while the Dexie liveQuery resolves; ProfileScreen's guard (`stored.onboarded !== undefined`) is always true for a boolean, so it snapshotted those defaults into local state and `settings.put()` wrote the snapshot wholesale — resetting `onboarded` to false and silently wiping `appPin`, `theme`, `autoLockMinutes`, and every field the screen does not own. Settings and Health screens shared the same race. | Added transactional `updateSettings(patch)` that merges over the stored row (never writes a UI snapshot); ProfileScreen now waits for `loaded` before snapshotting and saves an explicit allowlist of profile fields; Settings, Health, and Onboarding routed through the same merge. Covered by `tests/settings.test.tsx` (5 tests), verified to fail against the old implementation. |
 

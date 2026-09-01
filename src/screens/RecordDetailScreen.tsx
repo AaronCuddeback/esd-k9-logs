@@ -105,6 +105,7 @@ export default function RecordDetailScreen() {
                 </dd>
               </>
             )}
+            {session.areaSearched && (<><dt>Area searched</dt><dd>{session.areaSearched}</dd></>)}
             {session.caseNumber && (<><dt>Case / ref #</dt><dd>{session.caseNumber}</dd></>)}
             <dt>Time</dt><dd>{session.startTime || "—"}–{session.endTime || "—"} ({fmtMinutes(sessionMinutes(session))})</dd>
             <dt>Activity</dt><dd>{ACTIVITY_LABELS[session.activityType]}{session.activityOther ? ` — ${session.activityOther}` : ""}</dd>
