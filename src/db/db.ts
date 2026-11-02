@@ -14,7 +14,7 @@ import type {
   WeightEntry
 } from "./types";
 
-export const APP_VERSION = "2.0.0";
+export const APP_VERSION = "2.0.1";
 
 /**
  * Local-first database. Dexie versioning is the migration mechanism:

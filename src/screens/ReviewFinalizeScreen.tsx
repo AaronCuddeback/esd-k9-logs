@@ -57,18 +57,20 @@ export default function ReviewFinalizeScreen() {
   const stats = computeStats([session], exercises, hides);
   const typeLabel = (tid: string) => searchTypes?.find((t) => t.id === tid)?.label ?? tid;
 
-  const finalize = async () => {
+  // Every field is already on disk (the editors autosave the draft), so
+  // finalizing only flips the status and writes the audit entry. Don't make
+  // the handler watch that commit — some phones take seconds to flush
+  // IndexedDB. Go straight back to Today; the slot turns ✓ when it lands,
+  // and if it ever fails the record simply stays a draft to finish again.
+  const finalize = () => {
     if (busy) return;
     setBusy(true);
-    try {
-      await finalizeSession(session.id, settings.handlerName || session.handlerName);
-      toast("Record finalized");
-      navigate(`/record/${session.id}`, { replace: true });
-    } catch (e) {
-      toast((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
+    const label = isDeployment(session.activityType) ? "Deployment" : "Training";
+    finalizeSession(session.id, settings.handlerName || session.handlerName).catch((e) =>
+      toast(`${label} not finalized (${(e as Error).message}) — it is kept as a draft.`)
+    );
+    toast(`${label} record saved`);
+    navigate("/", { replace: true });
   };
 
   return (
