@@ -8,9 +8,33 @@ Open the app → choose **Set up my team** (enter handler, K9, agency — all
 editable later) or **Explore with sample data** to look around with the
 fictional K9 Cooper dataset first.
 
+## Daily training (v2.0)
+
+The home screen opens on **Today**: a Morning and an Evening slot, plus
+deployments. Each training is still its own record with its own times, so
+court exports list them separately; the card just groups them by day. The
+dots in the corner show the last 7 days (top = morning, bottom = evening).
+
+1. Tap **＋ Morning training** (or Evening). The location, area searched and
+   indoor/outdoor carry over from your last session, and Exercise 1 is
+   already created.
+2. Check **Where**: tap a saved location chip if it changed, confirm the
+   area searched and Indoor / Outdoor / Mixed (chosen once, here).
+3. In the exercise, tap **＋ Add hide** for each hide, tap the device to
+   change it (repeats the last one), then **✓** found or **✗** missed.
+   **Details** opens blindness, blank search, false responses, timing and
+   per-hide placement when you need them.
+4. Under **Time & record**: start time, then tap **15 / 20 / 30 / 45 min**
+   (or **Other** for a custom end time), activity type and case #.
+5. **Finish & save record** → certify → **Save record**.
+
+A deployment can be logged at any time with **🚔 Log deployment**; a
+morning or evening slot with only a deployment shows it, and you can still
+add the training.
+
 ## Logging a deployment (a real search)
 
-1. **＋ New Session** → tap **Deployment** → tap the location.
+1. On **Today**, tap **🚔 Log deployment** and enter the location.
 2. Enter the case / warrant number.
 3. Tap the areas you searched (residence, vehicle, storage unit…).
 4. For each device the K9 located, tap **＋ Add device located**, pick the

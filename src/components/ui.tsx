@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode
 } from "react";
+import { addMinutesToTime } from "../lib/format";
 
 // ---------- toast ----------
 
@@ -528,5 +529,160 @@ export function BigChoice({
         {sub && <span className="bc-sub">{sub}</span>}
       </span>
     </button>
+  );
+}
+
+// ---------- time: start + one-tap duration ----------
+
+const QUICK_MINUTES = [15, 20, 30, 45];
+
+function minutesBetween(start: string, end: string): number | null {
+  const a = /^(\d{1,2}):(\d{2})$/.exec(start);
+  const b = /^(\d{1,2}):(\d{2})$/.exec(end);
+  if (!a || !b) return null;
+  let d = Number(b[1]) * 60 + Number(b[2]) - (Number(a[1]) * 60 + Number(a[2]));
+  if (d < 0) d += 1440;
+  return d;
+}
+
+/**
+ * Start time plus duration chips. Most sessions are 15–30 minutes, so the
+ * end time is one tap; "Custom" still opens a real end-time picker.
+ * Changing the start keeps the chosen duration.
+ */
+export function TimeAndDuration({
+  startTime,
+  endTime,
+  onChange,
+  idPrefix,
+  startError,
+  endError
+}: {
+  startTime: string;
+  endTime: string;
+  onChange: (patch: { startTime?: string; endTime?: string }) => void;
+  idPrefix: string;
+  startError?: string;
+  endError?: string;
+}) {
+  const current = minutesBetween(startTime, endTime);
+  const isQuick = current !== null && QUICK_MINUTES.includes(current);
+  const [custom, setCustom] = useState(!!endTime && !isQuick);
+  return (
+    <>
+      <Field label="Start time" htmlFor={`${idPrefix}-start`} error={startError}>
+        <input
+          id={`${idPrefix}-start`}
+          type="time"
+          value={startTime}
+          onChange={(e) => {
+            const s = e.target.value;
+            onChange(
+              current !== null && !custom
+                ? { startTime: s, endTime: addMinutesToTime(s, current) }
+                : { startTime: s }
+            );
+          }}
+        />
+      </Field>
+      <div className="field">
+        <label>How long?</label>
+        <div className="duration-chips" role="group" aria-label="Duration">
+          {QUICK_MINUTES.map((m) => (
+            <button
+              key={m}
+              type="button"
+              aria-pressed={!custom && current === m}
+              disabled={!startTime}
+              onClick={() => {
+                setCustom(false);
+                onChange({ endTime: addMinutesToTime(startTime, m) });
+              }}
+            >
+              {m}
+              <small>min</small>
+            </button>
+          ))}
+          <button
+            type="button"
+            aria-pressed={custom}
+            onClick={() => setCustom(true)}
+          >
+            Other
+          </button>
+        </div>
+        {!startTime && <div className="hint">Set a start time first.</div>}
+      </div>
+      {custom && (
+        <Field
+          label="End time"
+          htmlFor={`${idPrefix}-end`}
+          error={endError}
+          hint={current !== null ? `${current} minutes` : undefined}
+        >
+          <input
+            id={`${idPrefix}-end`}
+            type="time"
+            value={endTime}
+            onChange={(e) => onChange({ endTime: e.target.value })}
+          />
+        </Field>
+      )}
+    </>
+  );
+}
+
+// ---------- device picker (grid sheet instead of a dropdown) ----------
+
+export function DeviceButton({
+  value,
+  onChange,
+  options,
+  labels,
+  icons,
+  ariaLabel,
+  disabled
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: string[];
+  labels: Record<string, string>;
+  icons: Record<string, string>;
+  ariaLabel: string;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        className="device-btn"
+        aria-label={`${ariaLabel}: ${labels[value] ?? value}`}
+        disabled={disabled}
+        onClick={() => setOpen(true)}
+      >
+        <span aria-hidden="true">{icons[value] ?? "❔"}</span>
+        <span className="device-name">{labels[value] ?? value}</span>
+        <span aria-hidden="true" className="device-caret">▾</span>
+      </button>
+      <Sheet open={open} onClose={() => setOpen(false)} title={ariaLabel}>
+        <div className="device-grid">
+          {options.map((o) => (
+            <button
+              key={o}
+              type="button"
+              aria-pressed={value === o}
+              onClick={() => {
+                onChange(o);
+                setOpen(false);
+              }}
+            >
+              <span aria-hidden="true" className="dg-icon">{icons[o] ?? "❔"}</span>
+              {labels[o] ?? o}
+            </button>
+          ))}
+        </div>
+      </Sheet>
+    </>
   );
 }

@@ -1,11 +1,12 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { db, useLiveQuery, useSettings } from "../hooks";
 import { TopBar, OfflineBanner } from "../components/shell";
 import { Stat, StatusBadge, EmptyState } from "../components/ui";
 import { computeStats, daysSince } from "../lib/stats";
-import { draftEditorPath, fmtDate, fmtMinutes, localDateIso } from "../lib/format";
+import { draftEditorPath, fmtDate, fmtMinutes, isDeployment, localDateIso } from "../lib/format";
 import { seedDatabase, isDatabaseEmpty } from "../db/seed";
 import { useState } from "react";
+import { TodayCard } from "../components/TodayCard";
 
 function CertExpiryBanner({ expiration, k9Name }: { expiration: string; k9Name: string }) {
   if (!expiration) return null;
@@ -57,7 +58,6 @@ function VaccineDueBanner() {
 }
 
 export default function HomeScreen() {
-  const navigate = useNavigate();
   const settings = useSettings();
   const [seeding, setSeeding] = useState(false);
 
@@ -66,7 +66,10 @@ export default function HomeScreen() {
     []
   );
   const drafts = useLiveQuery(
-    () => db.sessions.where("status").equals("draft").toArray(),
+    async () =>
+      (await db.sessions.where("status").equals("draft").toArray()).filter(
+        (d) => d.date !== localDateIso()
+      ),
     []
   );
   const last30 = useLiveQuery(async () => {
@@ -106,9 +109,11 @@ export default function HomeScreen() {
         />
         <VaccineDueBanner />
 
+        <TodayCard />
+
         {drafts && drafts.length > 0 && (
           <div className="card" style={{ borderColor: "var(--warn)" }}>
-            <h3>Unfinished draft{drafts.length > 1 ? "s" : ""}</h3>
+            <h3>Unfinished from earlier</h3>
             {drafts.map((d) => (
               <Link
                 key={d.id}
@@ -199,7 +204,10 @@ export default function HomeScreen() {
               <div className="primary">
                 {fmtDate(s.date, settings.dateFormat)} — {s.locationName || "Unnamed"}
               </div>
-              <div className="secondary">{s.objective || s.summary || "No objective recorded"}</div>
+              <div className="secondary">
+                {s.startTime && `${s.startTime} · `}
+                {s.areaSearched || s.summary || s.objective || (isDeployment(s.activityType) ? "Deployment" : "Training")}
+              </div>
             </div>
             <StatusBadge status={s.status} />
           </Link>
@@ -213,10 +221,6 @@ export default function HomeScreen() {
           Open calendar view
         </Link>
       </main>
-      <button type="button" className="fab" onClick={() => navigate("/new")}>
-        <span aria-hidden="true" style={{ fontSize: "1.3rem", lineHeight: 1 }}>＋</span>
-        New Session
-      </button>
     </>
   );
 }

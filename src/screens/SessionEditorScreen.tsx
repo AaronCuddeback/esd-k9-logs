@@ -1,15 +1,19 @@
 /**
- * Training session editor.
+ * Training session editor — one page, in the order a handler works:
  *
- * Only what a handler needs for a routine morning session is on screen:
- * location, exercises, notes, finish. Everything else — people, objective,
- * environment, welfare, GPS, follow-up — lives in collapsed sections so a
- * 15-minute box drill takes a handful of taps, while the full detail is
- * still there for certification or court-facing records.
+ *   Where (location, area searched, indoor/outdoor) → exercises with their
+ *   hides inline (device + found/missed) → time, type & case # → finish.
+ *
+ * Nothing routine is behind a dropdown or a second screen. Rarely used
+ * detail (people, objective, conditions, welfare, GPS, ratings, per-hide
+ * placement) is still one tap away under "More details" or an exercise's
+ * "Details" link, and every field still lands in the same record — so
+ * exports and court reports are exactly as before.
  *
  * Autosaves continuously while status = draft. For finalized records opened
- * in correction mode (?correct=1) edits are held locally and saved through
- * recordCorrection() with a required reason.
+ * in correction mode (?correct=1) session edits are held locally and saved
+ * through recordCorrection() with a required reason; exercise and hide
+ * corrections go through their own editors, which audit them.
  */
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -18,33 +22,78 @@ import { TopBar, OfflineBanner } from "../components/shell";
 import {
   Collapse,
   ConfirmSheet,
+  DeviceButton,
   Field,
   NumInput,
   RatingBar,
   Segmented,
   Sheet,
   StatusBadge,
+  TimeAndDuration,
   ToggleRow,
   useToast
 } from "../components/ui";
 import { AttachmentsCard } from "../components/AttachmentsCard";
-import type { ActivityType, Environment, TrainingSession } from "../db/types";
-import { emptyWelfare, newExercise } from "../db/factories";
+import type {
+  ActivityType,
+  Environment,
+  Exercise,
+  Hide,
+  HideOutcome,
+  SearchTypeDef,
+  TrainingSession
+} from "../db/types";
+import { emptyWelfare, newExercise, newHide } from "../db/factories";
 import {
   deleteDraftSession,
   deleteExercise,
+  deleteHide,
   recordCorrection,
+  saveExercise,
+  saveHide,
   saveSessionDraft,
+  searchTypeForEnvironment,
   touchLocation
 } from "../db/repo";
 import { tallyHides } from "../lib/stats";
 import { validateSession } from "../lib/validation";
-import { BLINDNESS_LABELS, fmtDate } from "../lib/format";
+import {
+  daySlot,
+  DEVICE_CHOICES,
+  DEVICE_ICONS,
+  DEVICE_SHORT,
+  fmtDate,
+  OUTCOME_LABELS,
+  SLOT_LABELS
+} from "../lib/format";
+
+/** Search types shown as one-tap chips; the rest are under "More". */
+const QUICK_TYPES: { id: string; label: string }[] = [
+  { id: "room", label: "🏠 Indoor" },
+  { id: "outdoor", label: "🌳 Outdoor" },
+  { id: "vehicle", label: "🚗 Vehicle" },
+  { id: "boxes", label: "📦 Boxes" }
+];
+
+const OUTDOOR_TYPES = new Set(["outdoor", "water"]);
+const NEUTRAL_TYPES = new Set(["vehicle"]);
+
+/** Session environment implied by its exercises' search types, or null if undecided. */
+function environmentFromExercises(exs: Exercise[]): Environment | null {
+  const kinds = new Set(
+    exs
+      .filter((e) => !NEUTRAL_TYPES.has(e.searchTypeId))
+      .map((e) => (OUTDOOR_TYPES.has(e.searchTypeId) ? "outdoor" : "indoor"))
+  );
+  if (kinds.size === 0) return null;
+  return kinds.size > 1 ? "mixed" : (kinds.values().next().value as Environment);
+}
 
 export default function SessionEditorScreen() {
   const { id } = useParams<{ id: string }>();
   const [params] = useSearchParams();
   const correcting = params.get("correct") === "1";
+  const suffix = correcting ? "?correct=1" : "";
   const navigate = useNavigate();
   const settings = useSettings();
   const toast = useToast();
@@ -55,7 +104,21 @@ export default function SessionEditorScreen() {
     [id]
   );
   const hides = useLiveQuery(() => db.hides.where("sessionId").equals(id!).toArray(), [id]);
-  const searchTypes = useLiveQuery(() => db.searchTypes.toArray(), []);
+  const searchTypes = useLiveQuery(
+    async () => (await db.searchTypes.toArray()).filter((t) => !t.archived),
+    []
+  );
+  const locations = useLiveQuery(async () => {
+    const all = await db.locations.toArray();
+    return all
+      .sort(
+        (a, b) =>
+          Number(b.favorite) - Number(a.favorite) ||
+          b.useCount - a.useCount ||
+          b.lastUsedAt.localeCompare(a.lastUsedAt)
+      )
+      .slice(0, 5);
+  }, []);
 
   const [session, setSession] = useState<TrainingSession | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -71,11 +134,11 @@ export default function SessionEditorScreen() {
   useEffect(() => {
     if (!stored) return;
     if (stored.activityType === "deployment_training") {
-      navigate(`/deployment/${stored.id}${correcting ? "?correct=1" : ""}`, { replace: true });
+      navigate(`/deployment/${stored.id}${suffix}`, { replace: true });
     } else if (stored.status !== "draft" && !correcting) {
       navigate(`/record/${stored.id}`, { replace: true });
     }
-  }, [stored, correcting, navigate]);
+  }, [stored, correcting, suffix, navigate]);
 
   const isDraft = stored?.status === "draft";
   const editable = isDraft || correcting;
@@ -94,7 +157,7 @@ export default function SessionEditorScreen() {
   if (!stored || !session || !exercises || !hides) {
     return (
       <>
-        <TopBar title="Session" back="/" />
+        <TopBar title="Training" back="/" />
         <main className="shell-main">
           {stored === null ? (
             <div className="empty">
@@ -113,20 +176,51 @@ export default function SessionEditorScreen() {
   const issues = validateSession(session);
   const errFor = (f: string) =>
     issues.find((i) => i.field === f && i.severity === "error")?.message;
-  const typeLabel = (tid: string) => searchTypes?.find((t) => t.id === tid)?.label ?? tid;
+
+  const selectLocation = async (name: string, address: string) => {
+    if (!isDraft) {
+      update({ locationName: name, locationAddress: address });
+      return;
+    }
+    const locId = await touchLocation(name, address);
+    update({ locationName: name, locationAddress: address, locationId: locId });
+  };
+
+  const setEnvironment = async (env: Environment) => {
+    update({ environment: env });
+    // keep indoor/outdoor exercises in step so it is only chosen once
+    if (isDraft && env !== "mixed") {
+      const want = searchTypeForEnvironment(env);
+      for (const ex of exercises) {
+        if ((ex.searchTypeId === "room" || ex.searchTypeId === "outdoor") && ex.searchTypeId !== want) {
+          await saveExercise({ ...ex, searchTypeId: want });
+        }
+      }
+    }
+  };
+
+  const setExerciseType = async (ex: Exercise, typeId: string) => {
+    const nextEx: Exercise = {
+      ...ex,
+      searchTypeId: typeId,
+      isBlankSearch: typeId === "blank" ? true : ex.isBlankSearch
+    };
+    await saveExercise(nextEx);
+    const env = environmentFromExercises(exercises.map((e) => (e.id === ex.id ? nextEx : e)));
+    if (env && env !== session.environment) update({ environment: env });
+  };
 
   const addExercise = async () => {
     await flushNow(session);
-    const ex = newExercise(session.id, (exercises[exercises.length - 1]?.order ?? 0) + 1);
-    // reuse the previous exercise's setup — most sessions repeat the pattern
     const prev = exercises[exercises.length - 1];
+    const ex = newExercise(session.id, (prev?.order ?? 0) + 1);
+    // reuse the previous exercise's setup — most sessions repeat the pattern
+    ex.searchTypeId = prev?.searchTypeId ?? searchTypeForEnvironment(session.environment);
     if (prev) {
-      ex.searchTypeId = prev.searchTypeId;
       ex.blindness = prev.blindness;
       ex.roomTypes = [...prev.roomTypes];
     }
-    await db.exercises.put(ex);
-    navigate(`/session/${session.id}/exercise/${ex.id}${correcting ? "?correct=1" : ""}`);
+    await saveExercise(ex);
   };
 
   const saveCorrection = async () => {
@@ -140,16 +234,20 @@ export default function SessionEditorScreen() {
     }
   };
 
+  const slot = daySlot(session.startTime);
   const showAdvanced = settings.showAdvancedFields;
+  const allHides = hides.filter((h) => !exercises.find((e) => e.id === h.exerciseId)?.isBlankSearch);
+  const totals = tallyHides(allHides);
+  const unmarked = allHides.filter((h) => !h.outcome).length;
 
   return (
     <>
       <TopBar
-        title={correcting ? "Correct Record" : "Training Session"}
+        title={correcting ? "Correct Record" : `${SLOT_LABELS[slot]} Training`}
         back={correcting ? `/record/${session.id}` : "/"}
         actions={
-          <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-3)" }} aria-live="polite">
-            {isDraft ? (saving ? "Saving…" : "Saved") : ""}
+          <span className="save-state" aria-live="polite">
+            {isDraft ? (saving ? "Saving…" : "✓ Saved") : ""}
           </span>
         }
       />
@@ -160,30 +258,41 @@ export default function SessionEditorScreen() {
             <span aria-hidden="true">✏️</span>
             <span>
               Correcting a finalized record. Original values are kept in the revision
-              history and a reason is required.
+              history and a reason is required. Use an exercise's Details to correct hides.
             </span>
           </div>
         )}
 
-        {/* --- essentials --- */}
-        <div className="card">
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: 10
-            }}
-          >
-            <strong>{fmtDate(session.date, settings.dateFormat)}</strong>
+        {/* --- 1. where --- */}
+        <div className="card step-card">
+          <div className="step-head">
+            <span className="step-num">1</span>
+            <h3>Where</h3>
+            <span className="grow" />
             <StatusBadge status={stored.status} />
           </div>
+          {locations && locations.length > 0 && (
+            <div className="chips loc-chips" role="group" aria-label="Saved locations">
+              {locations.map((l) => (
+                <button
+                  key={l.id}
+                  type="button"
+                  className="chip"
+                  aria-pressed={session.locationName.trim().toLowerCase() === l.name.toLowerCase()}
+                  onClick={() => selectLocation(l.name, l.address)}
+                >
+                  {l.favorite ? "⭐ " : "📍 "}
+                  {l.name}
+                </button>
+              ))}
+            </div>
+          )}
           <Field label="Location" htmlFor="s-loc" error={errFor("locationName")}>
             <input
               id="s-loc"
               type="text"
               value={session.locationName}
-              placeholder="Where are you training?"
+              placeholder="Tap a saved location or type a new one"
               onChange={(e) => update({ locationName: e.target.value })}
               onBlur={async () => {
                 if (session.locationName.trim() && isDraft) {
@@ -196,82 +305,116 @@ export default function SessionEditorScreen() {
               }}
             />
           </Field>
-          <Field
-            label="Area searched (optional)"
-            htmlFor="s-area"
-            hint="Which part of the location — bedroom, garage, back yard…"
-          >
+          <Field label="Area searched" htmlFor="s-area">
             <input
               id="s-area"
               type="text"
               value={session.areaSearched ?? ""}
-              placeholder="e.g., Master bedroom and garage"
+              placeholder="e.g., Living room, kitchen and garage"
               onChange={(e) => update({ areaSearched: e.target.value })}
+            />
+          </Field>
+          <Field label="Environment">
+            <Segmented<Environment>
+              ariaLabel="Environment"
+              value={session.environment}
+              options={[
+                { value: "indoor", label: "🏠 Indoor" },
+                { value: "outdoor", label: "🌳 Outdoor" },
+                { value: "mixed", label: "Mixed" }
+              ]}
+              onChange={setEnvironment}
             />
           </Field>
         </div>
 
-        {/* --- exercises: the main event --- */}
-        <div className="card">
-          <h3>Exercises ({exercises.length})</h3>
-          {exercises.length === 0 && (
-            <p style={{ color: "var(--text-2)", fontSize: "var(--fs-sm)" }}>
-              Add each search problem you ran — box drill, room search, vehicle line.
-            </p>
+        {/* --- 2. exercises & hides --- */}
+        <div className="step-head outside">
+          <span className="step-num">2</span>
+          <h3>Exercises</h3>
+          <span className="grow" />
+          {allHides.length > 0 && (
+            <span className="tally">
+              {totals.confirmedFinds}/{totals.hidesPlaced} found
+              {totals.misses ? ` · ${totals.misses} missed` : ""}
+            </span>
           )}
-          {exercises.map((ex) => {
-            const t = tallyHides(hides.filter((h) => h.exerciseId === ex.id));
-            return (
-              <div key={ex.id} style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                <Link
-                  className="list-item"
-                  style={{ flex: 1, marginBottom: 10 }}
-                  to={`/session/${session.id}/exercise/${ex.id}${correcting ? "?correct=1" : ""}`}
-                >
-                  <div className="grow">
-                    <div className="primary">
-                      {ex.order}. {typeLabel(ex.searchTypeId)}
-                      {ex.isBlankSearch ? " (blank)" : ""}
-                    </div>
-                    <div className="secondary">
-                      {ex.isBlankSearch
-                        ? ex.blankCorrect === true
-                          ? "Cleared correctly"
-                          : ex.blankCorrect === false
-                            ? "False response"
-                            : "No result yet"
-                        : `${t.confirmedFinds}/${t.hidesPlaced} found${t.misses ? ` · ${t.misses} missed` : ""}${
-                            ex.falseResponses.length ? ` · ${ex.falseResponses.length} false` : ""
-                          }`}
-                      {" · "}
-                      {BLINDNESS_LABELS[ex.blindness]}
-                    </div>
-                  </div>
-                </Link>
-                {isDraft && (
-                  <button
-                    type="button"
-                    className="icon-btn"
-                    aria-label={`Delete exercise ${ex.order}`}
-                    onClick={() => setDeleteExId(ex.id)}
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-            );
-          })}
-          <button type="button" className="btn block" onClick={addExercise}>
-            ＋ Add exercise
-          </button>
         </div>
+        {exercises.map((ex) => (
+          <ExerciseCard
+            key={ex.id}
+            ex={ex}
+            hides={hides
+              .filter((h) => h.exerciseId === ex.id)
+              .sort((a, b) => a.number - b.number)}
+            session={session}
+            searchTypes={searchTypes ?? []}
+            inlineEditable={isDraft}
+            detailsPath={`/session/${session.id}/exercise/${ex.id}${suffix}`}
+            hidePath={(hid) => `/session/${session.id}/exercise/${ex.id}/hide/${hid}${suffix}`}
+            onSetType={(t) => setExerciseType(ex, t)}
+            onDelete={exercises.length > 0 && isDraft ? () => setDeleteExId(ex.id) : undefined}
+          />
+        ))}
+        {exercises.length === 0 && (
+          <p className="muted-note">
+            Add each search you ran — a room, a vehicle line, a box drill.
+          </p>
+        )}
+        {isDraft && (
+          <button type="button" className="btn secondary block add-ex" onClick={addExercise}>
+            ＋ Add {exercises.length ? "another " : ""}exercise
+          </button>
+        )}
 
-        {/* --- notes --- */}
-        <div className="card">
+        {/* --- 3. time, type & case --- */}
+        <div className="card step-card">
+          <div className="step-head">
+            <span className="step-num">3</span>
+            <h3>Time &amp; record</h3>
+          </div>
+          <Field label="Date" htmlFor="s-date" error={errFor("date")}>
+            <input
+              id="s-date"
+              type="date"
+              value={session.date}
+              onChange={(e) => update({ date: e.target.value })}
+            />
+          </Field>
+          <TimeAndDuration
+            idPrefix="s"
+            startTime={session.startTime}
+            endTime={session.endTime}
+            startError={errFor("startTime")}
+            endError={errFor("endTime")}
+            onChange={(p) => update(p)}
+          />
+          <Field label="Activity type">
+            <Segmented<ActivityType>
+              ariaLabel="Activity type"
+              value={session.activityType}
+              options={[
+                { value: "training", label: "Training" },
+                { value: "certification", label: "Cert" },
+                { value: "remedial", label: "Remedial" },
+                { value: "other", label: "Other" }
+              ]}
+              onChange={(v) => update({ activityType: v })}
+            />
+          </Field>
+          <Field label="Case / reference #" htmlFor="s-case">
+            <input
+              id="s-case"
+              type="text"
+              value={session.caseNumber}
+              placeholder="e.g., 26-05965"
+              onChange={(e) => update({ caseNumber: e.target.value })}
+            />
+          </Field>
           <Field
-            label="Session notes (optional)"
+            label="Notes"
             htmlFor="s-summary"
-            hint="Use the keyboard microphone to dictate."
+            hint="Optional. Use the keyboard microphone to dictate."
           >
             <textarea
               id="s-summary"
@@ -282,82 +425,8 @@ export default function SessionEditorScreen() {
         </div>
 
         {/* --- everything optional, collapsed by default --- */}
-        <div className="card flat">
-          <Collapse title="⏱ Time, type & case number" defaultOpen={showAdvanced}>
-            <div className="row">
-              <Field label="Date" htmlFor="s-date" error={errFor("date")}>
-                <input
-                  id="s-date"
-                  type="date"
-                  value={session.date}
-                  onChange={(e) => update({ date: e.target.value })}
-                />
-              </Field>
-            </div>
-            <div className="row">
-              <Field label="Start" htmlFor="s-start" error={errFor("startTime")}>
-                <input
-                  id="s-start"
-                  type="time"
-                  value={session.startTime}
-                  onChange={(e) => update({ startTime: e.target.value })}
-                />
-              </Field>
-              <Field label="End" htmlFor="s-end" error={errFor("endTime")}>
-                <input
-                  id="s-end"
-                  type="time"
-                  value={session.endTime}
-                  onChange={(e) => update({ endTime: e.target.value })}
-                />
-              </Field>
-            </div>
-            <Field label="Activity type">
-              <Segmented<ActivityType>
-                ariaLabel="Activity type"
-                value={session.activityType}
-                options={[
-                  { value: "training", label: "Training" },
-                  { value: "certification", label: "Certification" },
-                  { value: "remedial", label: "Remedial" },
-                  { value: "other", label: "Other" }
-                ]}
-                onChange={(v) => update({ activityType: v })}
-              />
-            </Field>
-            {session.activityType !== "training" && (
-              <Field label="Case / reference #" htmlFor="s-case">
-                <input
-                  id="s-case"
-                  type="text"
-                  value={session.caseNumber}
-                  onChange={(e) => update({ caseNumber: e.target.value })}
-                />
-              </Field>
-            )}
-            <Field label="Environment">
-              <Segmented<Environment>
-                ariaLabel="Environment"
-                value={session.environment}
-                options={[
-                  { value: "indoor", label: "Indoor" },
-                  { value: "outdoor", label: "Outdoor" },
-                  { value: "mixed", label: "Mixed" }
-                ]}
-                onChange={(v) => update({ environment: v })}
-              />
-            </Field>
-            <Field label="Address / area" htmlFor="s-addr">
-              <input
-                id="s-addr"
-                type="text"
-                value={session.locationAddress}
-                onChange={(e) => update({ locationAddress: e.target.value })}
-              />
-            </Field>
-            <GpsField session={session} update={update} />
-          </Collapse>
-
+        <div className="card flat more-card">
+          <div className="more-title">More details (optional)</div>
           <Collapse title="👤 People & objective" defaultOpen={showAdvanced}>
             <div className="row">
               <Field label="Handler" htmlFor="s-handler" error={errFor("handlerName")}>
@@ -431,7 +500,16 @@ export default function SessionEditorScreen() {
             </Field>
           </Collapse>
 
-          <Collapse title="🌤 Conditions" defaultOpen={showAdvanced}>
+          <Collapse title="🌤 Conditions & address" defaultOpen={showAdvanced}>
+            <Field label="Address" htmlFor="s-addr">
+              <input
+                id="s-addr"
+                type="text"
+                value={session.locationAddress}
+                onChange={(e) => update({ locationAddress: e.target.value })}
+              />
+            </Field>
+            <GpsField session={session} update={update} />
             <EnvEditor session={session} update={update} />
           </Collapse>
 
@@ -449,7 +527,12 @@ export default function SessionEditorScreen() {
         <AttachmentsCard sessionId={session.id} readOnly={!editable} />
 
         {isDraft ? (
-          <>
+          <div className="finish-bar">
+            {unmarked > 0 && (
+              <div className="finish-hint">
+                {unmarked} hide{unmarked === 1 ? "" : "s"} not marked found or missed yet
+              </div>
+            )}
             <button
               type="button"
               className="btn block"
@@ -460,27 +543,27 @@ export default function SessionEditorScreen() {
             >
               Finish &amp; save record
             </button>
-            <button
-              type="button"
-              className="btn ghost block"
-              style={{ marginTop: 10 }}
-              onClick={async () => {
-                await flushNow(session);
-                toast("Draft saved");
-                navigate("/");
-              }}
-            >
-              Save for later
-            </button>
-            <button
-              type="button"
-              className="btn warn-outline block"
-              style={{ marginTop: 10 }}
-              onClick={() => setConfirmDelete(true)}
-            >
-              Delete draft
-            </button>
-          </>
+            <div className="row" style={{ marginTop: 10 }}>
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={async () => {
+                  await flushNow(session);
+                  toast("Draft saved");
+                  navigate("/");
+                }}
+              >
+                Save for later
+              </button>
+              <button
+                type="button"
+                className="btn ghost danger-text"
+                onClick={() => setConfirmDelete(true)}
+              >
+                Delete draft
+              </button>
+            </div>
+          </div>
         ) : (
           <button type="button" className="btn block" onClick={() => setReasonSheet(true)}>
             Save correction…
@@ -523,7 +606,7 @@ export default function SessionEditorScreen() {
             id="corr-reason"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            placeholder="e.g., Transposed find/miss counts for exercise 2"
+            placeholder="e.g., Wrong end time entered"
           />
         </Field>
         <button type="button" className="btn block" disabled={!reason.trim()} onClick={saveCorrection}>
@@ -531,6 +614,239 @@ export default function SessionEditorScreen() {
         </button>
       </Sheet>
     </>
+  );
+}
+
+// ---------- one exercise, hides inline ----------
+
+function ExerciseCard({
+  ex,
+  hides,
+  session,
+  searchTypes,
+  inlineEditable,
+  detailsPath,
+  hidePath,
+  onSetType,
+  onDelete
+}: {
+  ex: Exercise;
+  hides: Hide[];
+  session: TrainingSession;
+  searchTypes: SearchTypeDef[];
+  inlineEditable: boolean;
+  detailsPath: string;
+  hidePath: (hideId: string) => string;
+  onSetType: (typeId: string) => void;
+  onDelete?: () => void;
+}) {
+  const toast = useToast();
+  const [typeSheet, setTypeSheet] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState<Hide | null>(null);
+  const typeLabel = searchTypes.find((t) => t.id === ex.searchTypeId)?.label ?? ex.searchTypeId;
+  const isQuick = QUICK_TYPES.some((q) => q.id === ex.searchTypeId);
+  const t = tallyHides(hides);
+
+  const addHide = async () => {
+    const h = newHide(ex.id, ex.sessionId, (hides[hides.length - 1]?.number ?? 0) + 1);
+    h.placedBy = session.trainerName || session.handlerName;
+    h.handlerKnewLocation = ex.blindness === "known";
+    // repeat the previous hide's device — most drills use the same aid
+    if (hides.length > 0) h.deviceType = hides[hides.length - 1].deviceType;
+    await saveHide(h);
+  };
+
+  const removeLast = async () => {
+    const last = hides[hides.length - 1];
+    if (!last) return;
+    if (last.outcome || last.locationDescription.trim() || last.notes.trim()) {
+      setConfirmRemove(last);
+      return;
+    }
+    await deleteHide(last.id);
+  };
+
+  const setOutcome = (h: Hide, o: HideOutcome) =>
+    saveHide({ ...h, outcome: h.outcome === o ? "" : o });
+
+  return (
+    <div className="card ex-card">
+      <div className="ex-head">
+        <strong>Exercise {ex.order}</strong>
+        {!ex.isBlankSearch && hides.length > 0 && (
+          <span className="tally small">
+            {t.confirmedFinds}/{t.hidesPlaced}
+          </span>
+        )}
+        <span className="grow" />
+        <Link to={detailsPath} className="btn small ghost" style={{ textDecoration: "none" }}>
+          Details
+        </Link>
+        {onDelete && (
+          <button
+            type="button"
+            className="icon-btn small"
+            aria-label={`Delete exercise ${ex.order}`}
+            onClick={onDelete}
+          >
+            ✕
+          </button>
+        )}
+      </div>
+
+      <div className="chips type-chips" role="group" aria-label="Search type">
+        {QUICK_TYPES.map((q) => (
+          <button
+            key={q.id}
+            type="button"
+            className="chip"
+            disabled={!inlineEditable}
+            aria-pressed={ex.searchTypeId === q.id}
+            onClick={() => onSetType(q.id)}
+          >
+            {q.label}
+          </button>
+        ))}
+        <button
+          type="button"
+          className="chip"
+          disabled={!inlineEditable}
+          aria-pressed={!isQuick}
+          onClick={() => setTypeSheet(true)}
+        >
+          {isQuick ? "More…" : typeLabel}
+        </button>
+      </div>
+
+      {ex.isBlankSearch ? (
+        <div className="blank-row">
+          <span className="muted-note">Blank search (no odor placed)</span>
+          <Segmented
+            ariaLabel="Blank search result"
+            value={ex.blankCorrect === null ? "unset" : ex.blankCorrect ? "clear" : "false"}
+            options={[
+              { value: "clear", label: "✓ Cleared" },
+              { value: "false", label: "✗ False alert" }
+            ]}
+            onChange={(v) =>
+              inlineEditable && saveExercise({ ...ex, blankCorrect: v === "clear" })
+            }
+          />
+        </div>
+      ) : (
+        <>
+          <div className="hide-list">
+            {hides.map((h) => {
+              const nuanced =
+                h.outcome && h.outcome !== "found_independent" && h.outcome !== "missed";
+              return (
+                <div key={h.id} className={`hide-row outcome-${h.outcome || "none"}`}>
+                  <span className="hide-num">#{h.number}</span>
+                  <DeviceButton
+                    value={h.deviceType}
+                    options={DEVICE_CHOICES}
+                    labels={DEVICE_SHORT}
+                    icons={DEVICE_ICONS}
+                    ariaLabel={`Device for hide ${h.number}`}
+                    disabled={!inlineEditable}
+                    onChange={(v) => saveHide({ ...h, deviceType: v as Hide["deviceType"] })}
+                  />
+                  {nuanced ? (
+                    <Link to={hidePath(h.id)} className="nuanced">
+                      {OUTCOME_LABELS[h.outcome as HideOutcome]}
+                    </Link>
+                  ) : (
+                    <div className="hit-miss" role="group" aria-label={`Outcome for hide ${h.number}`}>
+                      <button
+                        type="button"
+                        className="hm found"
+                        aria-pressed={h.outcome === "found_independent"}
+                        aria-label={`Hide ${h.number} found`}
+                        disabled={!inlineEditable}
+                        onClick={() => setOutcome(h, "found_independent")}
+                      >
+                        ✓
+                      </button>
+                      <button
+                        type="button"
+                        className="hm missed"
+                        aria-pressed={h.outcome === "missed"}
+                        aria-label={`Hide ${h.number} missed`}
+                        disabled={!inlineEditable}
+                        onClick={() => setOutcome(h, "missed")}
+                      >
+                        ✗
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          {hides.length === 0 && (
+            <p className="muted-note">Add the hides you placed, then tap ✓ or ✗ for each.</p>
+          )}
+          {inlineEditable && (
+            <div className="hide-actions">
+              <button type="button" className="btn small" onClick={addHide}>
+                ＋ Add hide
+              </button>
+              {hides.length > 0 && (
+                <button type="button" className="btn small secondary" onClick={removeLast}>
+                  − Remove last
+                </button>
+              )}
+            </div>
+          )}
+          {inlineEditable && hides.length > 0 && hides.some((h) => !h.outcome) && (
+            <button
+              type="button"
+              className="btn small ghost all-found"
+              onClick={async () => {
+                for (const h of hides) if (!h.outcome) await saveHide({ ...h, outcome: "found_independent" });
+              }}
+            >
+              Mark the rest found
+            </button>
+          )}
+        </>
+      )}
+      {ex.falseResponses.length > 0 && (
+        <div className="muted-note" style={{ marginTop: 8 }}>
+          ⚠ {ex.falseResponses.length} false response{ex.falseResponses.length === 1 ? "" : "s"} recorded
+        </div>
+      )}
+
+      <Sheet open={typeSheet} onClose={() => setTypeSheet(false)} title="Search type">
+        <div className="device-grid">
+          {searchTypes.map((st) => (
+            <button
+              key={st.id}
+              type="button"
+              aria-pressed={ex.searchTypeId === st.id}
+              onClick={() => {
+                onSetType(st.id);
+                setTypeSheet(false);
+              }}
+            >
+              {st.label}
+            </button>
+          ))}
+        </div>
+      </Sheet>
+      <ConfirmSheet
+        open={confirmRemove !== null}
+        onClose={() => setConfirmRemove(null)}
+        onConfirm={async () => {
+          if (confirmRemove) await deleteHide(confirmRemove.id);
+          toast("Hide removed");
+        }}
+        title="Remove the last hide?"
+        message="It already has a result recorded. Removing it deletes that result."
+        confirmLabel="Remove"
+        danger
+      />
+    </div>
   );
 }
 

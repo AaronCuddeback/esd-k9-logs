@@ -15,6 +15,7 @@ import {
   ChipSelect,
   Collapse,
   ConfirmSheet,
+  DeviceButton,
   Field,
   NumInput,
   OutcomePicker,
@@ -29,23 +30,8 @@ import type { Blindness, Exercise, ExerciseResult, Hide, HideOutcome } from "../
 import { uuid, ROOM_TYPES } from "../db/db";
 import { newHide } from "../db/factories";
 import { deleteHide, diffFlat, recordChildCorrection, saveExercise, saveHide } from "../db/repo";
-import { DEVICE_LABELS } from "../lib/format";
+import { DEVICE_CHOICES, DEVICE_ICONS, DEVICE_SHORT } from "../lib/format";
 
-const QUICK_DEVICES: { value: string; label: string }[] = [
-  { value: "cellphone", label: "Cellphone" },
-  { value: "usb_drive", label: "USB drive" },
-  { value: "sd_card", label: "SD card" },
-  { value: "micro_sd", label: "MicroSD" },
-  { value: "sim_card", label: "SIM card" },
-  { value: "hard_drive", label: "Hard drive" },
-  { value: "ssd", label: "SSD" },
-  { value: "tablet", label: "Tablet" },
-  { value: "laptop", label: "Laptop" },
-  { value: "dvr", label: "DVR" },
-  { value: "game_console", label: "Game console" },
-  { value: "training_aid_odor", label: "Odor aid" },
-  { value: "other", label: "Other" }
-];
 
 export default function ExerciseEditorScreen() {
   const { id, exId } = useParams<{ id: string; exId: string }>();
@@ -182,39 +168,25 @@ export default function ExerciseEditorScreen() {
       <main className="shell-main">
         {/* --- what kind of search --- */}
         <div className="card">
-          {/* A native picker keeps 11+ search types to a single row instead
-              of a wall of chips; it is also pre-filled from the previous
-              exercise, so most sessions never touch it. */}
-          <Field label="Search type" htmlFor="ex-type">
-            <select
-              id="ex-type"
-              value={ex.searchTypeId}
-              onChange={(e) =>
-                update({
-                  searchTypeId: e.target.value,
-                  isBlankSearch: e.target.value === "blank" ? true : ex.isBlankSearch
-                })
-              }
-            >
+          <Field label="Search type">
+            <div className="chips" role="group" aria-label="Search type">
               {searchTypes?.map((t) => (
-                <option key={t.id} value={t.id}>
+                <button
+                  key={t.id}
+                  type="button"
+                  className="chip"
+                  aria-pressed={ex.searchTypeId === t.id}
+                  onClick={() =>
+                    update({
+                      searchTypeId: t.id,
+                      isBlankSearch: t.id === "blank" ? true : ex.isBlankSearch
+                    })
+                  }
+                >
                   {t.label}
-                </option>
+                </button>
               ))}
-            </select>
-          </Field>
-          <Field
-            label="Area searched (optional)"
-            htmlFor="ex-area"
-            hint="The specific area for this exercise."
-          >
-            <input
-              id="ex-area"
-              type="text"
-              value={ex.areaDescription}
-              placeholder="e.g., Bedroom, 12-box line, rear office"
-              onChange={(e) => update({ areaDescription: e.target.value })}
-            />
+            </div>
           </Field>
           <Field label="Hide knowledge">
             <Segmented<Blindness>
@@ -270,20 +242,14 @@ export default function ExerciseEditorScreen() {
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
                   <strong style={{ minWidth: 28 }}>#{h.number}</strong>
-                  <select
-                    aria-label={`Device for hide ${h.number}`}
+                  <DeviceButton
                     value={h.deviceType}
-                    onChange={(e) =>
-                      patchHide(h, { deviceType: e.target.value as Hide["deviceType"] })
-                    }
-                    style={{ flex: 1, minHeight: 48 }}
-                  >
-                    {QUICK_DEVICES.map((d) => (
-                      <option key={d.value} value={d.value}>
-                        {d.label}
-                      </option>
-                    ))}
-                  </select>
+                    options={DEVICE_CHOICES}
+                    labels={DEVICE_SHORT}
+                    icons={DEVICE_ICONS}
+                    ariaLabel={`Device for hide ${h.number}`}
+                    onChange={(v) => patchHide(h, { deviceType: v as Hide["deviceType"] })}
+                  />
                   <button
                     type="button"
                     className="icon-btn"
@@ -349,6 +315,19 @@ export default function ExerciseEditorScreen() {
         {/* --- everything else, collapsed --- */}
         <div className="card flat">
           <Collapse title="📝 Notes & result" defaultOpen={showAdvanced}>
+            <Field
+              label="Area for this exercise only"
+              htmlFor="ex-area"
+              hint="Only if it differs from the session's area searched."
+            >
+              <input
+                id="ex-area"
+                type="text"
+                value={ex.areaDescription}
+                placeholder="e.g., 12-box line, rear office"
+                onChange={(e) => update({ areaDescription: e.target.value })}
+              />
+            </Field>
             <Field label="Comments" htmlFor="ex-comments">
               <textarea
                 id="ex-comments"
@@ -460,7 +439,7 @@ export default function ExerciseEditorScreen() {
               navigate(`/session/${id}`);
             }}
           >
-            Done
+            Done — back to session
           </button>
         ) : (
           <button type="button" className="btn block" onClick={() => setReasonSheet(true)}>

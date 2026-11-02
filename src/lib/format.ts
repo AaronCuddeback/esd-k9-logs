@@ -112,3 +112,57 @@ export function pct(n: number | null): string {
   if (n == null) return "—";
   return `${Math.round(n * 100)}%`;
 }
+
+/** Device types in the order handlers reach for them. */
+export const DEVICE_CHOICES: DeviceType[] = [
+  "cellphone", "usb_drive", "sd_card", "micro_sd", "sim_card", "hard_drive",
+  "ssd", "tablet", "laptop", "dvr", "game_console", "training_aid_odor", "other"
+];
+
+/** Short device names for buttons; DEVICE_LABELS stays the export wording. */
+export const DEVICE_SHORT: Record<DeviceType, string> = {
+  ...DEVICE_LABELS,
+  micro_sd: "MicroSD",
+  training_aid_odor: "Odor aid"
+};
+
+export const DEVICE_ICONS: Record<DeviceType, string> = {
+  cellphone: "📱",
+  sd_card: "💾",
+  micro_sd: "💾",
+  usb_drive: "🔌",
+  sim_card: "📶",
+  hard_drive: "🗄️",
+  ssd: "🗄️",
+  tablet: "📲",
+  laptop: "💻",
+  dvr: "📼",
+  game_console: "🎮",
+  training_aid_odor: "🧪",
+  other: "❔"
+};
+
+/** "HH:mm" plus a number of minutes, wrapping past midnight. "" if start is empty. */
+export function addMinutesToTime(hhmm: string, minutes: number): string {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm);
+  if (!m) return "";
+  const total = (((Number(m[1]) * 60 + Number(m[2]) + minutes) % 1440) + 1440) % 1440;
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+
+export type DaySlot = "morning" | "evening";
+
+/**
+ * Which of the K9's two daily sessions a record belongs to. Derived from the
+ * start time (before noon = morning) so no new field is stored and every
+ * existing record classifies itself.
+ */
+export function daySlot(startTime: string): DaySlot {
+  const h = Number(startTime.split(":")[0]);
+  return Number.isFinite(h) && startTime && h < 12 ? "morning" : "evening";
+}
+
+export const SLOT_LABELS: Record<DaySlot, string> = {
+  morning: "Morning",
+  evening: "Evening"
+};

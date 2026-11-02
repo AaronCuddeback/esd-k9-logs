@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { HashRouter } from "react-router-dom";
 import App from "./App";
 import "./styles/app.css";
+import "./styles/daily.css";
 import { registerSW } from "virtual:pwa-register";
 
 // Auto-updating service worker: new versions activate on next load.

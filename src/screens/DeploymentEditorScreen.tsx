@@ -18,10 +18,12 @@ import {
   ChipSelect,
   Collapse,
   ConfirmSheet,
+  DeviceButton,
   Field,
   OutcomePicker,
   Sheet,
   StatusBadge,
+  TimeAndDuration,
   useToast
 } from "../components/ui";
 import { AttachmentsCard } from "../components/AttachmentsCard";
@@ -38,7 +40,7 @@ import {
   touchLocation
 } from "../db/repo";
 import { validateSession } from "../lib/validation";
-import { DEVICE_LABELS, fmtDate } from "../lib/format";
+import { DEVICE_ICONS, DEVICE_SHORT, fmtDate } from "../lib/format";
 
 const SEARCH_AREAS = [
   "Residence",
@@ -247,6 +249,22 @@ export default function DeploymentEditorScreen() {
               }}
             />
           </Field>
+          <Field label="Date" htmlFor="d-date" error={errFor("date")}>
+            <input
+              id="d-date"
+              type="date"
+              value={session.date}
+              onChange={(e) => update({ date: e.target.value })}
+            />
+          </Field>
+          <TimeAndDuration
+            idPrefix="d"
+            startTime={session.startTime}
+            endTime={session.endTime}
+            startError={errFor("startTime")}
+            endError={errFor("endTime")}
+            onChange={(p) => update(p)}
+          />
         </div>
 
         <div className="card">
@@ -291,20 +309,14 @@ export default function DeploymentEditorScreen() {
             >
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
                 <strong style={{ minWidth: 28 }}>#{f.number}</strong>
-                <select
-                  aria-label={`Device type for find ${f.number}`}
+                <DeviceButton
                   value={f.deviceType}
-                  onChange={(e) =>
-                    patchFind(f, { deviceType: e.target.value as Hide["deviceType"] })
-                  }
-                  style={{ flex: 1, minHeight: 48 }}
-                >
-                  {DEVICE_OPTIONS.map((d) => (
-                    <option key={d} value={d}>
-                      {DEVICE_LABELS[d]}
-                    </option>
-                  ))}
-                </select>
+                  options={DEVICE_OPTIONS}
+                  labels={DEVICE_SHORT}
+                  icons={DEVICE_ICONS}
+                  ariaLabel={`Device type for find ${f.number}`}
+                  onChange={(v) => patchFind(f, { deviceType: v as Hide["deviceType"] })}
+                />
                 <button
                   type="button"
                   className="icon-btn"
@@ -357,35 +369,7 @@ export default function DeploymentEditorScreen() {
         </div>
 
         <div className="card flat">
-          <Collapse title="⏱ Time & personnel" defaultOpen={settings.showAdvancedFields}>
-            <div className="row">
-              <Field label="Date" htmlFor="d-date" error={errFor("date")}>
-                <input
-                  id="d-date"
-                  type="date"
-                  value={session.date}
-                  onChange={(e) => update({ date: e.target.value })}
-                />
-              </Field>
-            </div>
-            <div className="row">
-              <Field label="Start" htmlFor="d-start">
-                <input
-                  id="d-start"
-                  type="time"
-                  value={session.startTime}
-                  onChange={(e) => update({ startTime: e.target.value })}
-                />
-              </Field>
-              <Field label="End" htmlFor="d-end">
-                <input
-                  id="d-end"
-                  type="time"
-                  value={session.endTime}
-                  onChange={(e) => update({ endTime: e.target.value })}
-                />
-              </Field>
-            </div>
+          <Collapse title="👤 Personnel" defaultOpen={settings.showAdvancedFields}>
             <Field label="Requesting agency / other personnel" htmlFor="d-personnel">
               <input
                 id="d-personnel"

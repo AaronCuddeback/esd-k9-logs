@@ -23,6 +23,8 @@ export function validateSession(s: TrainingSession): ValidationIssue[] {
     issues.push({ field: "endTime", message: "End time must be HH:MM.", severity: "error" });
   if (!s.locationName.trim())
     issues.push({ field: "locationName", message: "Location is required.", severity: "error" });
+  if (s.activityType !== "deployment_training" && !(s.areaSearched ?? "").trim())
+    issues.push({ field: "areaSearched", message: "Area searched is blank.", severity: "warning" });
   if (!s.handlerName.trim())
     issues.push({ field: "handlerName", message: "Handler is required.", severity: "error" });
   if (!s.k9Name.trim())

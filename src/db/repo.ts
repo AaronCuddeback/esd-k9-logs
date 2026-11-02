@@ -5,7 +5,7 @@
  * captures a field-level before/after audit entry.
  */
 import { db, nowIso, uuid, type EsdK9Db } from "./db";
-import { newExercise } from "./factories";
+import { newExercise, newSession } from "./factories";
 import type {
   Exercise,
   Hide,
@@ -447,4 +447,59 @@ export async function touchLocation(
     createdAt: nowIso()
   });
   return id;
+}
+
+// ---------- quick daily start ----------
+
+/** Default search type for a new exercise, from the session's environment. */
+export const searchTypeForEnvironment = (env: string) =>
+  env === "outdoor" ? "outdoor" : "room";
+
+/**
+ * Start today's morning or evening training in one tap. Location, area
+ * searched, environment and trainer carry over from the most recent
+ * training record (they rarely change day to day), and exercise 1 is
+ * created so the handler goes straight to logging hides.
+ *
+ * The start time is "now" when logging live; when logging the other half of
+ * the day after the fact it defaults to 07:00 / 18:00 so the record lands
+ * in the right slot — the handler can adjust it on the next screen.
+ */
+export async function startDailySession(
+  opts: {
+    slot: "morning" | "evening";
+    handlerName: string;
+    k9Name: string;
+    deployment?: boolean;
+  },
+  database: EsdK9Db = db
+): Promise<TrainingSession> {
+  const s = newSession({ handlerName: opts.handlerName, k9Name: opts.k9Name });
+  const hour = new Date().getHours();
+  const liveSlot = hour < 12 ? "morning" : "evening";
+  if (!opts.deployment && opts.slot !== liveSlot) {
+    s.startTime = opts.slot === "morning" ? "07:00" : "18:00";
+  }
+  if (opts.deployment) {
+    s.activityType = "deployment_training";
+    await database.sessions.put(s);
+    return s;
+  }
+  const recent = await database.sessions.orderBy("updatedAt").reverse().limit(25).toArray();
+  const prev = recent.find((r) => r.activityType !== "deployment_training" && r.locationName);
+  if (prev) {
+    s.locationId = prev.locationId;
+    s.locationName = prev.locationName;
+    s.locationAddress = prev.locationAddress;
+    s.areaSearched = prev.areaSearched ?? "";
+    s.environment = prev.environment;
+    s.trainerName = prev.trainerName;
+  }
+  const ex = newExercise(s.id, 1);
+  ex.searchTypeId = searchTypeForEnvironment(s.environment);
+  await database.transaction("rw", [database.sessions, database.exercises], async () => {
+    await database.sessions.put(s);
+    await database.exercises.put(ex);
+  });
+  return s;
 }

@@ -86,6 +86,17 @@ export default function ReviewFinalizeScreen() {
             {session.startTime || "—"} to {session.endTime || "—"} ·{" "}
             {fmtMinutes(sessionMinutes(session))} · {session.handlerName} with K9 {session.k9Name}
           </p>
+          {(session.areaSearched || session.caseNumber) && (
+            <p style={{ color: "var(--text-2)" }}>
+              {[
+                session.areaSearched && `Area: ${session.areaSearched}`,
+                !isDeployment(session.activityType) && session.environment,
+                session.caseNumber && `Case # ${session.caseNumber}`
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          )}
           {session.objective && <p>{session.objective}</p>}
         </div>
 
